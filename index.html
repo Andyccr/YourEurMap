@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161a20">
+  <title>Europa Canvas</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <svg id="map" role="img" aria-label="Greater Europe painting map"></svg>
+      <div id="labels" aria-hidden="true"></div>
+    </div>
+
+    <header id="topbar" data-obstacle>
+      <div class="brand">
+        <p class="eyebrow">Atlas sandbox</p>
+        <h1>Europa Canvas</h1>
+      </div>
+      <p id="scenario-label" class="scenario-label">Choose a map</p>
+      <div class="desktop-tools" role="toolbar" aria-label="Map tools">
+        <button type="button" id="tool-move" data-tool="move" aria-pressed="true">Move <kbd>V</kbd></button>
+        <button type="button" id="tool-paint" data-tool="paint" aria-pressed="false">Paint <kbd>B</kbd></button>
+        <button type="button" id="tool-pick" data-tool="pick" aria-pressed="false">Pick <kbd>I</kbd></button>
+        <button type="button" id="undo" aria-label="Undo">Undo</button>
+        <button type="button" id="redo" aria-label="Redo">Redo</button>
+      </div>
+      <div class="top-actions">
+        <button type="button" id="open-search" aria-label="Search">Search</button>
+        <button type="button" id="open-layers" aria-label="Map layers">Layers</button>
+        <button type="button" id="open-save">Save</button>
+        <button type="button" id="open-menu" aria-label="Menu">Menu</button>
+      </div>
+    </header>
+
+    <div id="dock-backdrop" hidden></div>
+    <aside id="dock" data-obstacle aria-label="Countries and search" hidden>
+      <div class="dock-head">
+        <div class="search-row">
+          <label class="sr-only" for="search">Search countries, provinces, and cities</label>
+          <input id="search" type="search" placeholder="Search countries, provinces, cities" autocomplete="off">
+          <button type="button" id="clear-search" aria-label="Clear search">Clear</button>
+          <button type="button" id="close-dock" aria-label="Close country list">Close</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="List">
+          <button type="button" id="tab-countries" role="tab" aria-selected="true">Countries</button>
+          <button type="button" id="tab-provinces" role="tab" aria-selected="false">Provinces</button>
+        </div>
+        <button type="button" id="create-country" class="create-btn">Create a country</button>
+      </div>
+      <div id="list" class="list" tabindex="0"></div>
+    </aside>
+
+    <section id="detail" data-obstacle hidden aria-live="polite"></section>
+    <div id="brush" data-obstacle hidden></div>
+    <div id="zoom" data-obstacle>
+      <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+      <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" id="zoom-fit" aria-label="Show the whole map">Fit</button>
+    </div>
+
+    <nav id="mobilebar" aria-label="Mobile tools">
+      <button type="button" data-tool="move">Move</button>
+      <button type="button" data-tool="paint">Paint</button>
+      <button type="button" data-tool="pick">Pick</button>
+      <button type="button" id="mobile-countries">Countries</button>
+      <button type="button" id="mobile-save">Save</button>
+    </nav>
+
+    <div id="toasts" aria-live="polite"></div>
+    <div id="conflict" class="banner" hidden></div>
+    <p id="status" class="status" role="status"></p>
+
+    <section id="gate" class="gate">
+      <div class="gate-card">
+        <p class="eyebrow">Greater Europe</p>
+        <h2>Europa Canvas</h2>
+        <p class="lede">Choose an era, pick a country, and repaint the continent. No armies, no ledger — just the atlas.</p>
+        <div id="gate-body"></div>
+      </div>
+    </section>
+    <div id="modal-root"></div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
