@@ -157,7 +157,7 @@ export function visualProvinces(atoms, ownership) {
 
 function makeProvince(atoms, ownership, gid, indexes, key) {
   const first = atoms[indexes[0]];
-  const uniformDesigned = indexes.length === atoms.filter((atom) => atom.gid === gid).length;
+  const uniformDesigned = indexes.length === (first.gidCount || indexes.length);
   let name = uniformDesigned ? first.groupName || first.n : indexes.map((index) => atoms[index].n).slice(0, 3).join("–");
   if (!uniformDesigned && indexes.length === 1) name = first.n;
   const aka = [];
@@ -455,10 +455,13 @@ export function atomsOfCountry(ownership, countryId) {
 
 export function prepareAtoms(catalog) {
   const groupById = catalog.groups || {};
+  const counts = new Map();
+  for (const atom of catalog.atoms) counts.set(atom.gid, (counts.get(atom.gid) || 0) + 1);
   return catalog.atoms.map((atom) => {
     const group = groupById[atom.gid] || {};
     return {
       ...atom,
+      gidCount: counts.get(atom.gid) || 1,
       groupName: group.n || atom.n,
       groupLocal: group.l || atom.l,
       groupCap: group.cap || null,

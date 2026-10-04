@@ -68,7 +68,7 @@ python3 -m http.server 4173
 
 1. 选年份，或继续已有地图。
 2. 在左侧列表点一个国家，或点「Create a country」填写名字和颜色。
-3. 在地图上点击一个省，或按住拖过一片省。松手后，这一笔才记入撤销。
+3. 在地图上点击一个省，或按住拖过一片省。松手后，这一笔才记入撤销。双击，或按住 Shift 再点，会把陆地相连的一整片同色区域一次涂满。
 4. 涂错了就撤销。也可以点提示里的 Undo。
 5. 满意后打开 Save，写入六个槽位中的一个，或导出图片。
 
@@ -248,7 +248,7 @@ A copy served from a subfolder, such as `http://127.0.0.1:8080/YourEurMap/`, als
 
 1. Choose a year, or continue an existing map.
 2. Pick a country in the list, or choose Create a country and set a name and color.
-3. Click a province, or drag across several. The stroke becomes one undo when you release.
+3. Click a province, or drag across several. The stroke becomes one undo when you release. Double-click, or Shift-click, fills the whole land-connected region of one color.
 4. Undo a mistake, including from the toast.
 5. Open Save, keep a named slot, or export a picture.
 

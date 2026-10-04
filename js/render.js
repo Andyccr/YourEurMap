@@ -32,8 +32,9 @@ export function createMapView(svg, catalog, atoms) {
   maskShade.setAttribute("width", String(mapW));
   maskShade.setAttribute("height", String(mapH));
   maskShade.setAttribute("fill", "black");
-  const maskLand = document.createElementNS(ns, "g");
-  maskLand.id = "mask-land";
+  const maskLand = document.createElementNS(ns, "path");
+  maskLand.setAttribute("fill", "white");
+  maskLand.setAttribute("fill-rule", "evenodd");
   mask.append(maskShade, maskLand);
   defs.append(mask);
   svg.append(defs);
@@ -63,19 +64,21 @@ export function createMapView(svg, catalog, atoms) {
   svg.append(provinceBorders, nationalBorders, hover, selected);
 
   const paths = atoms.map((atom) => ringsToPath(atom.rings));
+  maskLand.setAttribute("d", paths.join(""));
   const elements = paths.map((d, index) => {
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", d);
     path.setAttribute("fill-rule", "evenodd");
-    path.dataset.index = String(index);
     path.classList.add("atom");
     atomLayer.append(path);
-    const maskPath = document.createElementNS(ns, "path");
-    maskPath.setAttribute("d", d);
-    maskPath.setAttribute("fill", "white");
-    maskLand.append(maskPath);
     return path;
   });
+  const edges = catalog.edges.map((edge) => ({
+    a: edge.a,
+    b: edge.b,
+    d: edge.d,
+    same: atoms[edge.a].gid === atoms[edge.b].gid,
+  }));
 
   const grid = buildGrid(atoms, mapW, mapH);
   let ownership = catalog.scenarios[0].owners.slice();
@@ -85,7 +88,9 @@ export function createMapView(svg, catalog, atoms) {
   let labelFrame = 0;
   let borderFrame = 0;
   let cullFrame = 0;
+  let placedLabels = [];
   const labelRoot = document.getElementById("labels");
+  const box = { left: 0, top: 0, width: 1, height: 1 };
 
   function colorOf(id) {
     return countries.get(id)?.color || "#8d8376";
@@ -94,8 +99,10 @@ export function createMapView(svg, catalog, atoms) {
   function paintAtom(index) {
     const color = colorOf(ownership[index]);
     const element = elements[index];
+    if (element.dataset.color === color) return;
+    element.dataset.color = color;
     element.setAttribute("fill", color);
-    element.style.stroke = color;
+    element.setAttribute("stroke", color);
   }
 
   function paintAll() {
@@ -103,15 +110,15 @@ export function createMapView(svg, catalog, atoms) {
   }
 
   function rebuildBorders() {
-    const { atomProvince } = visualProvinces(atoms, ownership);
-    let province = "";
-    let national = "";
-    for (const edge of catalog.edges) {
-      if (ownership[edge.a] !== ownership[edge.b]) national += edge.d;
-      else if (atomProvince[edge.a]?.key !== atomProvince[edge.b]?.key) province += edge.d;
+    const province = [];
+    const national = [];
+    for (let i = 0; i < edges.length; i += 1) {
+      const edge = edges[i];
+      if (ownership[edge.a] !== ownership[edge.b]) national.push(edge.d);
+      else if (!edge.same) province.push(edge.d);
     }
-    provinceBorders.setAttribute("d", province);
-    nationalBorders.setAttribute("d", national);
+    provinceBorders.setAttribute("d", province.join(""));
+    nationalBorders.setAttribute("d", national.join(""));
   }
 
   function scheduleBorders() {
@@ -127,13 +134,38 @@ export function createMapView(svg, catalog, atoms) {
     selected.setAttribute("d", indexes?.length ? indexes.map((index) => paths[index]).join("") : "");
   }
 
-  function applyCamera() {
+  function refreshBox() {
     const rect = svg.getBoundingClientRect();
-    const ratio = rect.height > 0 ? rect.height / rect.width : mapH / mapW;
+    box.left = rect.left;
+    box.top = rect.top;
+    box.width = rect.width || 1;
+    box.height = rect.height || 1;
+  }
+
+  function applyCamera() {
+    const ratio = box.height > 1 ? box.height / box.width : mapH / mapW;
     camera.h = camera.w * ratio;
     const x = camera.cx - camera.w / 2;
     const y = camera.cy - camera.h / 2;
     svg.setAttribute("viewBox", `${x} ${y} ${camera.w} ${camera.h}`);
+    positionLabels();
+  }
+
+  function positionLabels() {
+    if (!placedLabels.length) return;
+    const left = camera.cx - camera.w / 2;
+    const top = camera.cy - camera.h / 2;
+    const sx = box.width / camera.w;
+    const sy = box.height / (camera.h || 1);
+    for (let i = 0; i < placedLabels.length; i += 1) {
+      const item = placedLabels[i];
+      const px = (item.x - left) * sx;
+      const py = (item.y - top) * sy;
+      const hidden = px < -40 || py < -20 || px > box.width + 40 || py > box.height + 20;
+      item.node.style.left = `${px}px`;
+      item.node.style.top = `${py}px`;
+      item.node.style.visibility = hidden ? "hidden" : "visible";
+    }
   }
 
   function cull() {
@@ -170,8 +202,8 @@ export function createMapView(svg, catalog, atoms) {
 
   function updateLabels() {
     if (!labelRoot) return;
-    const rect = svg.getBoundingClientRect();
-    if (rect.width < 20) return;
+    refreshBox();
+    if (box.width < 20) return;
     const zoom = camera.w / mapW;
     const items = [];
     if (layers.cities !== false) {
@@ -179,11 +211,13 @@ export function createMapView(svg, catalog, atoms) {
       const max = zoom > 0.72 ? 12 : zoom > 0.42 ? 24 : 36;
       for (const city of catalog.cities) {
         if (city.r > rankLimit) continue;
-        const screen = toScreen(city.x, city.y, rect);
+        const screen = toScreen(city.x, city.y);
         items.push({
           text: city.n,
           x: screen.x,
           y: screen.y,
+          mapX: city.x,
+          mapY: city.y,
           w: textWidth(city.n, 12),
           h: 16,
           rank: city.r,
@@ -207,11 +241,15 @@ export function createMapView(svg, catalog, atoms) {
       for (const group of groups.values()) {
         const country = countries.get(group.id);
         if (!country || group.area < 8000) continue;
-        const screen = toScreen(group.x / group.area, group.y / group.area, rect);
+        const mapX = group.x / group.area;
+        const mapY = group.y / group.area;
+        const screen = toScreen(mapX, mapY);
         items.push({
           text: country.name,
           x: screen.x,
           y: screen.y,
+          mapX,
+          mapY,
           w: textWidth(country.name, 13),
           h: 18,
           rank: group.area > 80000 ? 0 : 1,
@@ -223,11 +261,15 @@ export function createMapView(svg, catalog, atoms) {
     if (layers.provinceNames && zoom < 0.45) {
       const { provinces } = visualProvinces(atoms, ownership);
       for (const province of provinces) {
-        const screen = toScreen((province.bbox[0] + province.bbox[2]) / 2, (province.bbox[1] + province.bbox[3]) / 2, rect);
+        const mapX = (province.bbox[0] + province.bbox[2]) / 2;
+        const mapY = (province.bbox[1] + province.bbox[3]) / 2;
+        const screen = toScreen(mapX, mapY);
         items.push({
           text: province.name,
           x: screen.x,
           y: screen.y,
+          mapX,
+          mapY,
           w: textWidth(province.name, 11),
           h: 14,
           rank: 2,
@@ -238,11 +280,13 @@ export function createMapView(svg, catalog, atoms) {
     }
     for (const sea of catalog.seas || []) {
       if (zoom > 0.55) continue;
-      const screen = toScreen(sea.x, sea.y, rect);
+      const screen = toScreen(sea.x, sea.y);
       items.push({
         text: sea.n,
         x: screen.x,
         y: screen.y,
+        mapX: sea.x,
+        mapY: sea.y,
         w: textWidth(sea.n, 12),
         h: 16,
         rank: 1,
@@ -250,21 +294,21 @@ export function createMapView(svg, catalog, atoms) {
         kind: "sea",
       });
     }
-    const bounds = { x: 8, y: 8, w: rect.width - 16, h: rect.height - 16 };
+    const bounds = { x: 8, y: 8, w: box.width - 16, h: box.height - 16 };
     const placed = layoutAnnotations(items, bounds, {
-      max: zoom > 0.72 ? 16 : zoom > 0.4 ? 28 : 40,
+      max: zoom > 0.72 ? 14 : zoom > 0.4 ? 24 : 32,
       gap: 8,
       obstacles: obstacles(),
     });
     labelRoot.replaceChildren();
-    for (const item of placed) {
+    placedLabels = placed.map((item) => {
       const node = document.createElement("span");
       node.className = `map-label map-label-${item.kind}`;
       node.textContent = item.text;
-      node.style.left = `${item.x}px`;
-      node.style.top = `${item.y}px`;
       labelRoot.append(node);
-    }
+      return { node, x: item.mapX, y: item.mapY };
+    });
+    positionLabels();
   }
 
   function scheduleLabels() {
@@ -272,22 +316,21 @@ export function createMapView(svg, catalog, atoms) {
     labelFrame = requestAnimationFrame(updateLabels);
   }
 
-  function toScreen(x, y, rect = svg.getBoundingClientRect()) {
+  function toScreen(x, y) {
     const left = camera.cx - camera.w / 2;
     const top = camera.cy - camera.h / 2;
     return {
-      x: ((x - left) / camera.w) * rect.width,
-      y: ((y - top) / camera.h) * rect.height,
+      x: ((x - left) / camera.w) * box.width,
+      y: ((y - top) / camera.h) * box.height,
     };
   }
 
   function screenToMap(clientX, clientY) {
-    const rect = svg.getBoundingClientRect();
     const left = camera.cx - camera.w / 2;
     const top = camera.cy - camera.h / 2;
     return {
-      x: left + ((clientX - rect.left) / rect.width) * camera.w,
-      y: top + ((clientY - rect.top) / rect.height) * camera.h,
+      x: left + ((clientX - box.left) / box.width) * camera.w,
+      y: top + ((clientY - box.top) / box.height) * camera.h,
     };
   }
 
@@ -332,7 +375,9 @@ export function createMapView(svg, catalog, atoms) {
       camera = { ...camera, ...next };
       applyCamera();
     },
+    refreshBox,
     resize() {
+      refreshBox();
       applyCamera();
       scheduleCull();
       scheduleLabels();
