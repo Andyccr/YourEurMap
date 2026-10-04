@@ -108,13 +108,23 @@ async function boot() {
   }
 }
 
+const SITE_ROOT = new URL("../", import.meta.url);
+
+function siteUrl(path) {
+  return new URL(path, SITE_ROOT).href;
+}
+
 function fetchCatalog() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
-  return fetch("data/map.json", { signal: controller.signal })
+  return fetch(siteUrl("data/map.json"), { signal: controller.signal })
     .then((response) => {
       if (!response.ok) throw new Error("The atlas file did not load.");
       return response.json();
+    })
+    .then((data) => {
+      if (data.terrain && !/^[a-z]+:/i.test(data.terrain)) data.terrain = siteUrl(data.terrain);
+      return data;
     })
     .finally(() => clearTimeout(timer));
 }
