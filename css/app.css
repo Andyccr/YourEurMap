@@ -86,14 +86,17 @@ button { cursor: pointer; }
 #map.tool-paint { cursor: crosshair; }
 #map.tool-pick { cursor: copy; }
 .sea { fill: var(--sea); }
+#atoms { opacity: 0.88; }
 .atom {
-  stroke-width: 1.3px;
+  stroke-width: 1.15;
   stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  fill-opacity: 0.8;
+  pointer-events: none;
+}
+#terrain, #province-borders, #national-borders, #hover-ring, #selected-ring {
+  pointer-events: none;
 }
 #province-borders, #national-borders, #hover-ring, #selected-ring {
-  fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linejoin: round;
+  fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round;
 }
 #province-borders { stroke: rgba(36, 28, 20, 0.33); stroke-width: 0.75px; }
 #national-borders { stroke: #24180f; stroke-width: 2.2px; }
@@ -193,8 +196,10 @@ body.dock-open #brush { left: 388px; }
 #brush {
   position: absolute; z-index: 5; left: 12px; bottom: 14px;
   display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px;
-  max-width: min(420px, calc(100vw - 24px));
+  max-width: min(560px, calc(100vw - 24px));
 }
+#brush .brush-copy { min-width: 180px; }
+#brush strong { white-space: nowrap; }
 #brush strong { display: block; }
 #brush .swatch { width: 18px; height: 18px; }
 #zoom {

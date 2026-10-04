@@ -277,15 +277,16 @@ function setTool(tool) {
   });
 }
 
-function setBrush(id, { rememberPrevious = true } = {}) {
+function setBrush(id, { rememberPrevious = true, closeDock = false } = {}) {
   if (!state.countries.has(id)) return;
   if (rememberPrevious && state.brushId && state.brushId !== id) state.previousBrushId = state.brushId;
   state.brushId = id;
   state.recent = [id, ...state.recent.filter((item) => item !== id)].slice(0, 6);
   setTool("paint");
   renderBrush();
-  renderList();
   renderDetail();
+  if (closeDock) openDock(false);
+  else if (!$("dock").hidden) renderList();
   storage.remember({ brushMemory: { scenarioId: state.scenarioId, brushId: id } });
 }
 
@@ -381,6 +382,41 @@ function paintProvince(index) {
   view.setSelected(province.indexes);
 }
 
+function fillConnected(index) {
+  if (!state.brushId) {
+    toast("Choose a country to paint with.");
+    openDock(true);
+    return;
+  }
+  const entry = state.history.past.at(-1);
+  if (entry?.changes?.some((change) => change.i === index) && Date.now() - (entry.at || 0) < 520) {
+    applyOwnership(state.ownership, entry.changes, "undo");
+    state.history.past.pop();
+    state.history.future.length = 0;
+  }
+  const before = state.ownership.slice();
+  if (before[index] === state.brushId) return;
+  const region = connectedAtoms(state.atoms, before, index);
+  const groups = groupsNow();
+  const names = new Set();
+  region.forEach((atomIndex) => {
+    names.add(groups.atomProvince[atomIndex]?.name);
+    state.ownership[atomIndex] = state.brushId;
+  });
+  const changes = diffOwnership(before, state.ownership);
+  if (!changes.length) return;
+  view.paintAtoms(changes.map((change) => change.i));
+  view.rebuildBorders();
+  const label = names.size > 1 ? `Filled ${names.size} connected provinces` : describePaint(1, [...names][0]);
+  pushHistory(state.history, { label, changes, at: Date.now() });
+  toast(label, { offerUndo: true });
+  state.selection = index;
+  view.setSelected([index]);
+  scheduleSave();
+  renderDetail();
+  if (!$("dock").hidden) renderList();
+}
+
 function endGesture() {
   if (!gesture) return;
   const current = gesture;
@@ -399,7 +435,7 @@ function endGesture() {
     if (province) names.add(province.name);
   });
   const label = describePaint(names.size, names.size === 1 ? [...names][0] : "");
-  pushHistory(state.history, { label, changes });
+  pushHistory(state.history, { label, changes, at: Date.now() });
   toast(label, { offerUndo: true });
   scheduleSave();
   renderList();
@@ -580,11 +616,12 @@ function renderBrush() {
   swatch.className = "swatch";
   swatch.style.background = country.color;
   const copy = document.createElement("span");
+  copy.className = "brush-copy";
   const name = document.createElement("strong");
   name.textContent = country.name;
   const meta = document.createElement("span");
   meta.className = "meta";
-  meta.textContent = "Painting with this country";
+  meta.textContent = "Drag to paint. Double-click fills a region.";
   copy.append(name, meta);
   const previous = document.createElement("button");
   previous.type = "button";
@@ -595,7 +632,11 @@ function renderBrush() {
   locate.type = "button";
   locate.textContent = "Locate";
   locate.addEventListener("click", () => locateCountry(country.id));
-  node.append(swatch, copy, previous, locate);
+  const countries = document.createElement("button");
+  countries.type = "button";
+  countries.textContent = "Countries";
+  countries.addEventListener("click", () => openDock(true));
+  node.append(swatch, copy, previous, locate, countries);
 }
 
 function renderList() {
@@ -686,7 +727,7 @@ function countryRow(country, counts) {
   meta.textContent = country.id === state.brushId ? `Painting · ${count} provinces` : `${count} provinces`;
   copy.append(name, meta);
   main.append(swatch, copy);
-  main.addEventListener("click", () => setBrush(country.id));
+  main.addEventListener("click", () => setBrush(country.id, { closeDock: true }));
   const locate = iconButton("Locate", () => locateCountry(country.id));
   const edit = iconButton("Edit", () => countryDialog(country));
   row.append(main, locate, edit);
@@ -835,9 +876,7 @@ function toast(message, { offerUndo = false } = {}) {
     });
     node.append(button);
   }
-  const stack = $("toasts");
-  while (stack.children.length > 1) stack.firstElementChild.remove();
-  stack.append(node);
+  $("toasts").replaceChildren(node);
   setTimeout(() => node.remove(), offerUndo ? 5000 : 2800);
 }
 
@@ -977,7 +1016,7 @@ function showOnboarding() {
   const box = dialogShell("A short guide");
   const steps = [
     "Choose a country, or create one. That country becomes your brush.",
-    "Click a province or drag across several. Each stroke is one undo.",
+    "Click or drag to paint. Double-click, or Shift-click, fills a connected region. Each stroke is one undo.",
     "Drag to move the atlas. Scroll or pinch to zoom. Hold Space to pan while painting.",
     "Maps save in this browser. Export JSON to move them, or export a PNG or SVG.",
   ];
@@ -1319,10 +1358,30 @@ function bind() {
   observer.observe($("stage"));
 }
 
+let wheelFrame = 0;
+let wheelState = null;
+let settleTimer = 0;
+
 function onWheel(event) {
   event.preventDefault();
-  const factor = event.deltaY > 0 ? 1.1 : 0.9;
-  zoomAt(event.clientX, event.clientY, factor);
+  const factor = event.deltaY > 0 ? 1.09 : 0.92;
+  if (!wheelState) {
+    wheelState = { x: event.clientX, y: event.clientY, factor: 1 };
+    wheelFrame = requestAnimationFrame(flushWheel);
+  }
+  wheelState.factor *= factor;
+  wheelState.x = event.clientX;
+  wheelState.y = event.clientY;
+}
+
+function flushWheel() {
+  wheelFrame = 0;
+  if (!wheelState) return;
+  const next = wheelState;
+  wheelState = null;
+  zoomAt(next.x, next.y, next.factor);
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => view.settle(), 140);
 }
 
 function zoomAtCenter(factor) {
@@ -1331,6 +1390,7 @@ function zoomAtCenter(factor) {
 }
 
 function zoomAt(clientX, clientY, factor) {
+  view.refreshBox();
   const before = view.screenToMap(clientX, clientY);
   const rect = $("map").getBoundingClientRect();
   const ratio = rect.height / Math.max(rect.width, 1);
@@ -1339,11 +1399,15 @@ function zoomAt(clientX, clientY, factor) {
   const left = before.x - ((clientX - rect.left) / rect.width) * nextW;
   const top = before.y - ((clientY - rect.top) / rect.height) * (nextW * ratio);
   view.setCamera({ cx: left + nextW / 2, cy: top + (nextW * ratio) / 2, w: nextW });
-  view.settle();
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => view.settle(), 140);
 }
+
+let pointerFrame = 0;
 
 function onPointerDown(event) {
   if (!state.loaded) return;
+  view.refreshBox();
   try { $("map").setPointerCapture(event.pointerId); } catch { /* pointer already released */ }
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (pointers.size >= 2) {
@@ -1368,6 +1432,10 @@ function onPointerDown(event) {
     }
     return;
   }
+  if (state.tool === "paint" && !spaceHeld && event.button === 0 && index >= 0 && (event.detail === 2 || event.shiftKey)) {
+    fillConnected(index);
+    return;
+  }
   if (state.tool === "paint" && !spaceHeld && event.button === 0) {
     if (index >= 0) paintProvince(index);
     return;
@@ -1379,6 +1447,12 @@ function onPointerDown(event) {
 function onPointerMove(event) {
   if (!pointers.has(event.pointerId)) return;
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (!pointerFrame) pointerFrame = requestAnimationFrame(flushPointer);
+}
+
+function flushPointer() {
+  pointerFrame = 0;
+  if (!pointers.size) return;
   if (pointers.size >= 2 && pinch) {
     const [a, b] = [...pointers.values()];
     const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
@@ -1396,6 +1470,7 @@ function onPointerMove(event) {
     ).w;
     const relX = (midX - rect.left) / rect.width;
     const relY = (midY - rect.top) / rect.height;
+    view.refreshBox();
     view.setCamera({
       w: nextW,
       cx: pinch.map.x - (relX - 0.5) * nextW,
@@ -1404,16 +1479,17 @@ function onPointerMove(event) {
     return;
   }
   if (gesture && state.tool === "paint" && !spaceHeld) {
-    const index = view.hitTest(event.clientX, event.clientY);
+    const point = [...pointers.values()].at(-1);
+    const index = point ? view.hitTest(point.x, point.y) : -1;
     if (index >= 0) paintProvince(index);
-    const province = index >= 0 ? gestureGroups.atomProvince[index] : null;
-    view.setHover(province ? province.indexes : []);
+    view.setHover(index >= 0 ? [index] : []);
     return;
   }
   if (pan) {
+    const point = [...pointers.values()][0];
     const rect = $("map").getBoundingClientRect();
-    const dx = ((event.clientX - pan.x) / rect.width) * view.camera.w;
-    const dy = ((event.clientY - pan.y) / rect.height) * (view.camera.h || view.camera.w);
+    const dx = ((point.x - pan.x) / rect.width) * view.camera.w;
+    const dy = ((point.y - pan.y) / rect.height) * (view.camera.h || view.camera.w);
     view.setCamera({ cx: pan.cx - dx, cy: pan.cy - dy, w: view.camera.w });
   }
 }
