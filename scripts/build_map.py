@@ -1096,7 +1096,7 @@ def main():
         ),
         "attribution": (
             "Coastlines and administrative areas: Natural Earth 1:10m cultural vectors, public domain. "
-            "Populated places: Natural Earth 1:50m, public domain. "
+            "Populated places: Natural Earth 1:10m, public domain. "
             "Terrain shading: Natural Earth I shaded relief, public domain, cropped and reprojected. "
             "Game provinces merge small neighboring units when they share the same owner in every included scenario."
         ),
