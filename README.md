@@ -4,7 +4,11 @@
 
 A static browser sandbox for painting Greater Europe. Choose a year, choose a country, and recolor provinces. There are no armies, diplomacy, economy, or goals. A year only decides who owns the land at the start.
 
-在线游玩 / Play online: <https://andyccr.github.io/YourEurMap/>
+在线游玩 / Play online: <https://andyccr.com/YourEurMap/>
+
+`https://andyccr.github.io/YourEurMap/` 会跳到这个地址。网站从仓库 `main` 分支的根目录发布，不需要另外打包。
+
+`https://andyccr.github.io/YourEurMap/` redirects there. The site is the root of the `main` branch. There is no separate build.
 
 不要双击 `index.html`。浏览器会拦截本地文件里的模块和地图数据。用上面的网页，或按下面的方式在本机起一个静态服务器。
 
@@ -35,14 +39,14 @@ Europa Canvas 是一张可以涂改的大欧洲地图。范围大约是冰岛到
 
 仓库已经按静态网站准备好，不需要安装、打包或账号。
 
-1. 打开 <https://andyccr.github.io/YourEurMap/>。
+1. 打开 <https://andyccr.com/YourEurMap/>。
 2. 等地图出现。第一次打开要下载约 1.5 MB 的省界和约 600 KB 的地形，之后浏览器会缓存。
 3. 选一个年份，或在这台浏览器里已有存档时点继续。
 4. 点一个国家，或新建一个国家。选中后立刻可以涂色。
 
 这个地址是项目站点，游戏在 `/YourEurMap/` 下面，不在域名根目录。页面里的脚本、样式、字体、省界和地形都用相对地址，所以子目录可以正常打开。仓库根目录有一个空的 `.nojekyll`，用来告诉 GitHub 不要用 Jekyll 处理这些文件，否则地图数据可能不会被原样发布。
 
-Pages 发布的是分支 `cursor/europa-canvas-cba9` 的根目录。合并进 `main` 之后，如果希望网站跟着主分支更新，把仓库 Settings → Pages → Branch 改成 `main`，文件夹选 `/ (root)`。
+发布设置是 `main` 分支、文件夹 `/ (root)`。把更新合并进 `main` 之后，Pages 会在一两分钟内换成新文件。请保留根目录的 `.nojekyll`，避免 Jekyll 漏掉 `data/` 里的地图。
 
 如果页面一直停在加载，或提示地图没有载入：刷新一次；确认地址以 `/YourEurMap/` 结尾；换一个没有拦截脚本的浏览器。本地存档不会因为地图文件加载失败而被删掉。
 
@@ -215,14 +219,14 @@ Ownership and province shapes are approximate. They are for play. They are not a
 
 The repository is the website. Nothing has to be installed, built, or signed in to play.
 
-1. Open <https://andyccr.github.io/YourEurMap/>.
+1. Open <https://andyccr.com/YourEurMap/>.
 2. Wait for the map. The first visit downloads about 1.5 MB of provinces and about 600 KB of terrain. The browser can cache them after that.
 3. Choose a year, or continue a map already stored in this browser.
 4. Choose a country, or create one. Painting starts as soon as the country is selected.
 
 The address is a project site. The game lives under `/YourEurMap/`, not at the bare domain root. Scripts, styles, fonts, provinces, and terrain use relative URLs, so that folder works. An empty `.nojekyll` file in the repository root tells GitHub Pages to publish the files as they are. Without it, Jekyll can drop or rewrite the map data.
 
-Pages is publishing the root of branch `cursor/europa-canvas-cba9`. After this work is merged, point Settings → Pages → Branch at `main` and `/ (root)` if the live site should follow the default branch.
+The Pages source is the `main` branch and the `/ (root)` folder. After a change is merged into `main`, Pages picks it up within a minute or two. Keep the root `.nojekyll` file so Jekyll does not skip the map in `data/`.
 
 If the page stays on the loading gate, refresh once, make sure the address ends in `/YourEurMap/`, and try a browser that is not blocking scripts. A failed map download does not delete saves already stored in the browser.
 
