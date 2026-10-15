@@ -3,7 +3,9 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { buildSvg } from "../js/export-map.js";
 import { layoutAnnotations } from "../js/labels.js";
+import { decodeRings } from "../js/rings.js";
 import {
+  MAP_FORMAT,
   applyOwnership,
   connectedAtoms,
   createGesture,
@@ -152,6 +154,22 @@ test("labels avoid overlap", () => {
     { text: "Nice", x: 200, y: 80, w: 40, h: 16, rank: 1, priority: 4 },
   ], { x: 0, y: 0, w: 400, h: 200 }, { max: 5, gap: 2 });
   assert.deepEqual(placed.map((item) => item.text), ["Paris", "Nice"]);
+});
+
+test("packed rings restore the same closed coordinates", () => {
+  const rings = decodeRings("AQAEAAAABAABAAEBAAE=");
+  assert.deepEqual(rings, [[[0, 4], [1, 4], [2, 5], [2, 6], [0, 4]]]);
+});
+
+test("shipped atlas keeps save versions and packed geometry", () => {
+  const map = JSON.parse(readFileSync(new URL("../data/map.json", import.meta.url)));
+  assert.equal(MAP_FORMAT, "europa-canvas-map");
+  assert.equal(map.atoms[0].rings, undefined);
+  assert.equal(typeof map.atoms[0].g, "string");
+  const rings = decodeRings(map.atoms[0].g);
+  assert.ok(rings[0].length >= 4);
+  assert.deepEqual(rings[0][0], rings[0][rings[0].length - 1]);
+  assert.equal(map.scenarios.length, 6);
 });
 
 test("historical scenario boundaries stay intact in the built atlas", () => {

@@ -64,6 +64,12 @@ python3 -m http.server 4173
 
 如果把仓库放在别的目录名下面，例如 `http://127.0.0.1:8080/YourEurMap/`，同样可以直接玩。服务器必须把目录末尾的斜线处理好；Python 自带的 `http.server` 会做这件事。
 
+### 界面语言
+
+按钮和说明会跟着浏览器语言走：语言以 `zh` 开头时用中文，否则用英文。国家和省份的名字仍用地图数据里的原文。
+
+想改语言：打开菜单，点「语言」，选「中文」或 English。选择记在这台浏览器的 `localStorage` 里，键名是 `europa-canvas-lang`，下次打开还会用它。这和地图存档分开，换语言不会改你涂过的图。
+
 ### 桌面怎么操作
 
 1. 选年份，或继续已有地图。
@@ -154,7 +160,7 @@ python3 -m pip install --user shapely numpy pillow
 python3 scripts/build_map.py
 ```
 
-归属规则写在 `scripts/owners.py`，几何和合并写在 `scripts/build_map.py`。
+省界坐标在写入 `data/map.json` 前会压成差分字节再做 base64（`scripts/ringpack.py`，由 `js/rings.js` 还原）。点击判定用的形状和压缩前相同。归属规则写在 `scripts/owners.py`，几何和合并写在 `scripts/build_map.py`。
 
 ### 文件
 
@@ -244,6 +250,12 @@ Open <http://127.0.0.1:4173>.
 
 A copy served from a subfolder, such as `http://127.0.0.1:8080/YourEurMap/`, also works. The server should redirect a directory URL so that it ends with a slash. Python’s `http.server` does that.
 
+### Interface language
+
+Buttons and instructions follow the browser language: a `zh` locale uses Chinese, and anything else uses English. Country and province names stay in the atlas data.
+
+To change it, open the menu, choose Language, then 中文 or English. The choice is stored in this browser under `europa-canvas-lang`, separate from map saves, and is used again next time. Switching language does not alter painted ownership.
+
 ### Desktop
 
 1. Choose a year, or continue an existing map.
@@ -332,7 +344,7 @@ python3 -m pip install --user shapely numpy pillow
 python3 scripts/build_map.py
 ```
 
-Ownership rules are in `scripts/owners.py`. Geometry and merging are in `scripts/build_map.py`.
+Province outlines are stored as delta bytes in base64 (`scripts/ringpack.py`, restored by `js/rings.js`). Hit testing uses the same shapes as before the packing. Ownership rules are in `scripts/owners.py`. Geometry and merging are in `scripts/build_map.py`.
 
 ### Files
 

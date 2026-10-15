@@ -88,6 +88,7 @@ export function createMapView(svg, catalog, atoms) {
   let labelFrame = 0;
   let borderFrame = 0;
   let cullFrame = 0;
+  let deferBorders = false;
   let placedLabels = [];
   const labelRoot = document.getElementById("labels");
   const box = { left: 0, top: 0, width: 1, height: 1 };
@@ -122,6 +123,7 @@ export function createMapView(svg, catalog, atoms) {
   }
 
   function scheduleBorders() {
+    if (deferBorders) return;
     cancelAnimationFrame(borderFrame);
     borderFrame = requestAnimationFrame(rebuildBorders);
   }
@@ -300,13 +302,24 @@ export function createMapView(svg, catalog, atoms) {
       gap: 8,
       obstacles: obstacles(),
     });
+    const same = placed.length === placedLabels.length && placed.every((item, index) => (
+      placedLabels[index].text === item.text && placedLabels[index].kind === item.kind
+    ));
+    if (same) {
+      for (let i = 0; i < placed.length; i += 1) {
+        placedLabels[i].x = placed[i].mapX;
+        placedLabels[i].y = placed[i].mapY;
+      }
+      positionLabels();
+      return;
+    }
     labelRoot.replaceChildren();
     placedLabels = placed.map((item) => {
       const node = document.createElement("span");
       node.className = `map-label map-label-${item.kind}`;
       node.textContent = item.text;
       labelRoot.append(node);
-      return { node, x: item.mapX, y: item.mapY };
+      return { node, x: item.mapX, y: item.mapY, text: item.text, kind: item.kind };
     });
     positionLabels();
   }
@@ -367,6 +380,10 @@ export function createMapView(svg, catalog, atoms) {
     paintAtoms(indexes) {
       for (const index of indexes) paintAtom(index);
       scheduleBorders();
+    },
+    setDeferBorders(value) {
+      deferBorders = value;
+      if (!value) scheduleBorders();
     },
     rebuildBorders,
     setHover,

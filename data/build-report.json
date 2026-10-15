@@ -6,6 +6,7 @@
   "polities": 109,
   "width": 2400,
   "height": 2646,
-  "bytes": 1565737,
-  "terrainBytes": 615647
+  "bytes": 819123,
+  "terrainBytes": 615647,
+  "ringEncoding": "delta-int8-base64"
 }

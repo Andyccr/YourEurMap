@@ -33,16 +33,16 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
   let paused = false;
   let lastError = "";
 
-  function setStatus(message, tone = "info") {
-    lastError = tone === "error" ? message : "";
-    onStatus?.({ message, tone, paused, storageFull: tone === "error" && /full/i.test(message) });
+  function setStatus(code, tone = "info") {
+    lastError = tone === "error" ? code : "";
+    onStatus?.({ code, tone, paused, storageFull: code === "quota" });
   }
 
   function readRaw(key) {
     try {
       return localStorage.getItem(key);
     } catch (error) {
-      setStatus("This browser blocked local storage. Export a JSON copy to keep your map.", "error");
+      setStatus("blocked", "error");
       return null;
     }
   }
@@ -53,12 +53,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
       return true;
     } catch (error) {
       const full = error?.name === "QuotaExceededError" || error?.code === 22;
-      setStatus(
-        full
-          ? "Browser storage is full. Export your map before it is lost."
-          : "This browser could not store the map. Export a JSON copy.",
-        "error",
-      );
+      setStatus(full ? "quota" : "write", "error");
       return false;
     }
   }
@@ -68,7 +63,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
     baseRevision = next.revision || 0;
     dirty = false;
     paused = false;
-    if (!silent) setStatus("Loaded the latest saved library.", "ok");
+    if (!silent) setStatus("loaded", "ok");
     onRemote?.(library);
   }
 
@@ -99,7 +94,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
           if (recovered.ok) {
             library = recovered.library;
             baseRevision = library.revision || 0;
-            setStatus("The save library could not be read. Restored the last good checkpoint.", "error");
+            setStatus("checkpoint", "error");
             return library;
           }
         } catch {
@@ -108,7 +103,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
       }
       library = emptyLibrary();
       baseRevision = 0;
-      setStatus("Saved data could not be read. An unreadable copy was kept on this browser.", "error");
+      setStatus("unreadable", "error");
       return library;
     }
   }
@@ -125,7 +120,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
         if (Number(remote.revision || 0) !== baseRevision) {
           paused = true;
           onConflict?.(remote, snapshot());
-          setStatus("Another tab changed this library. Autosave is paused.", "error");
+          setStatus("tab", "error");
           return false;
         }
       } catch {
@@ -138,7 +133,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
     next.version = LIBRARY_VERSION;
     const text = JSON.stringify(next);
     if (text.length > LIMITS.libraryChars) {
-      setStatus("The save library is too large to store. Export it instead.", "error");
+      setStatus("tooLarge", "error");
       return false;
     }
     if (!writeRaw(KEY, text)) return false;
@@ -159,13 +154,13 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
     baseRevision = next.revision;
     dirty = false;
     paused = false;
-    setStatus("Saved in this browser.", "ok");
+    setStatus("saved", "ok");
     return true;
   }
 
   function touch(mutator) {
     if (paused) {
-      setStatus("Autosave is paused until the other tab’s changes are resolved.", "error");
+      setStatus("paused", "error");
       return false;
     }
     const next = snapshot();
@@ -252,7 +247,7 @@ export function createStorage({ onConflict, onStatus, onRemote }) {
     }
     paused = true;
     onConflict?.(remote, snapshot());
-    setStatus("Another tab changed this library. Autosave is paused.", "error");
+    setStatus("tab", "error");
   });
 
   return {
