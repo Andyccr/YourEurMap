@@ -1,5 +1,7 @@
 /** Gameplay rules that do not touch the DOM or the network. */
 
+import { decodeRings } from "./rings.js";
+
 export const MAP_FORMAT = "europa-canvas-map";
 export const LIBRARY_FORMAT = "europa-canvas-library";
 export const MAP_VERSION = 1;
@@ -459,8 +461,10 @@ export function prepareAtoms(catalog) {
   for (const atom of catalog.atoms) counts.set(atom.gid, (counts.get(atom.gid) || 0) + 1);
   return catalog.atoms.map((atom) => {
     const group = groupById[atom.gid] || {};
+    const { g, rings, ...rest } = atom;
     return {
-      ...atom,
+      ...rest,
+      rings: rings || decodeRings(g),
       gidCount: counts.get(atom.gid) || 1,
       groupName: group.n || atom.n,
       groupLocal: group.l || atom.l,

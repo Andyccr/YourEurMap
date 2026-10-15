@@ -29,6 +29,7 @@ from shapely.ops import transform, unary_union
 from shapely.strtree import STRtree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ringpack import pack_rings  # noqa: E402
 from owners import (  # noqa: E402
     COUNTRIES,
     SCENARIOS,
@@ -1016,7 +1017,7 @@ def main():
             "n": atom["display"],
             "l": atom["local"],
             "aka": sorted({alias for alias in atom["aka"] + [atom["name"], atom["local"]] if alias and alias != atom["display"]}),
-            "rings": rings,
+            "g": pack_rings(rings),
             "b": box,
             "cx": int(round(sx)),
             "cy": int(round(sy)),
