@@ -1,0 +1,388 @@
+/** UI copy. Country and province names stay in the atlas data. */
+
+const STRINGS = {
+  en: {
+    eyebrow: "Atlas sandbox",
+    greaterEurope: "Greater Europe",
+    chooseMap: "Choose a map",
+    gateLede: "Choose an era, pick a country, and repaint the continent. No armies, no ledger — just the atlas.",
+    move: "Move",
+    paint: "Paint",
+    pick: "Pick",
+    undo: "Undo",
+    redo: "Redo",
+    search: "Search",
+    layers: "Layers",
+    save: "Save",
+    menu: "Menu",
+    searchLabel: "Search countries, provinces, and cities",
+    searchPlaceholder: "Search countries, provinces, cities",
+    clear: "Clear",
+    close: "Close",
+    listLabel: "List",
+    countries: "Countries",
+    provinces: "Provinces",
+    createCountry: "Create a country",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    fit: "Fit",
+    fitLabel: "Show the whole map",
+    toolsLabel: "Map tools",
+    mobileTools: "Mobile tools",
+    dockLabel: "Countries and search",
+    mapLabel: "Greater Europe painting map",
+    continue: "Continue “{title}” · {scenario}",
+    retry: "Retry",
+    downloadSave: "Download the saved map",
+    loadSlow: "The atlas took too long to load.",
+    loadFail: "The atlas could not be loaded. Local saves on this browser are untouched.",
+    noCountry: "No country selected",
+    brushHint: "Drag to paint. Double-click fills a region.",
+    previous: "Previous",
+    locate: "Locate",
+    showMore: "Show more",
+    recent: "Recent brushes",
+    withoutLand: "Without territory",
+    paintingCount: "Painting · {count} provinces",
+    provinceCount: "{count} provinces",
+    city: "City",
+    emptySearch: "No countries, provinces, or cities match “{query}”.",
+    originalName: "Original geographic name: {name}",
+    owner: "Owner: {name}",
+    unknown: "Unknown",
+    capitalVerified: "Administrative capital: {name}",
+    capitalApprox: "Approximate game center: {name}",
+    gameCenter: "Game center",
+    combines: "Combines {count} original regions: {names}.",
+    assign: "Assign to current country",
+    pickOwner: "Pick its current owner",
+    paintConnected: "Paint connected region",
+    transfer: "Transfer owner's territory",
+    chooseCountry: "Choose a country to paint with.",
+    noTerritory: "That country has no territory to locate.",
+    transferTitle: "Transfer territory",
+    transferBody: "Give every province of {from} to {to}?",
+    thisCountry: "this country",
+    currentBrush: "the current brush",
+    filled: "Filled {count} connected provinces",
+    undid: "Undid {label}",
+    redid: "Redid {label}",
+    created: "Created a country",
+    edited: "Edited a country",
+    restored: "Restored {title}.",
+    savedSlot: "Saved to slot {index}.",
+    importedLibrary: "Imported the save library. You can undo this from the save menu.",
+    restoredLibrary: "Restored the previous save library.",
+    fileTooLarge: "That file is too large.",
+    libraryTooLarge: "That library is too large.",
+    badJson: "That file could not be read as JSON.",
+    imageFailed: "The image export failed. Try again.",
+    keptTab: "Kept this tab’s map.",
+    conflict: "Another tab saved newer progress. Autosave is paused.",
+    keepTab: "Keep this tab",
+    loadLatest: "Load latest",
+    exportTab: "Export this tab",
+    cancel: "Cancel",
+    overwriteTitle: "Overwrite slot",
+    overwriteBody: "Replace “{title}”?",
+    overwrite: "Overwrite",
+    saveHere: "Save here",
+    load: "Load",
+    emptySlot: "Empty slot {index}",
+    editCountry: "Edit country",
+    createTitle: "Create a country",
+    countryName: "Country name",
+    countryColor: "Country color",
+    saveChanges: "Save changes",
+    paintWith: "Paint with this country",
+    guideTitle: "A short guide",
+    guide1: "Choose a country, or create one. That country becomes your brush.",
+    guide2: "Click or drag to paint. Double-click, or Shift-click, fills a connected region. Each stroke is one undo.",
+    guide3: "Drag to move the atlas. Scroll or pinch to zoom. Hold Space to pan while painting.",
+    guide4: "Maps save in this browser. Export JSON to move them, or export a PNG or SVG.",
+    dontShow: "Don’t show this again",
+    startPainting: "Start painting",
+    saveTitle: "Save this map",
+    mapTitle: "Map title",
+    savesNote: "Saves stay in this browser. Export JSON if you want the map on another device. Six named slots are kept separately from the automatic save.",
+    exportMap: "Export this map",
+    exportLibrary: "Export save library",
+    importMap: "Import a map",
+    importLibrary: "Import a library",
+    restoreRecovery: "Restore recovery copy",
+    undoLibrary: "Undo library import",
+    exportTitle: "Export artwork",
+    artworkTitle: "Artwork title",
+    exportSize: "Export size",
+    countryNames: "Country names",
+    majorCities: "Major cities",
+    legend: "Territory legend",
+    exportNote: "Exports draw the full atlas, not only the labels currently on screen. Scenario and data attribution are always included.",
+    downloadPng: "Download PNG",
+    downloadSvg: "Download SVG",
+    menuTitle: "Menu",
+    newMap: "New map",
+    saves: "Saves",
+    exportArtwork: "Export artwork",
+    shortcuts: "Keyboard shortcuts",
+    about: "About this atlas",
+    language: "Language",
+    shortcutsTitle: "Shortcuts",
+    short1: "V move, B paint, I pick a country from the map",
+    short2: "Drag paints while the paint tool is active. Hold Space to pan.",
+    short3: "Right-click picks the country under the cursor.",
+    short4: "W previous brush, F locate the current country, / search",
+    short5: "Ctrl or Cmd Z undo, Ctrl or Cmd Shift Z redo, Ctrl or Cmd S save",
+    short6: "Escape closes the panel in front. Double-click fills a connected region.",
+    layersTitle: "Map layers",
+    layerTerrain: "Terrain shading",
+    layerBorders: "Province borders",
+    layerCities: "Cities",
+    layerProvinceNames: "Province names",
+    layerCountryNames: "Country names",
+    closeDialog: "Close dialog",
+    untitled: "Untitled map",
+    statusBlocked: "This browser blocked local storage. Export a JSON copy to keep your map.",
+    statusQuota: "Browser storage is full. Export your map before it is lost.",
+    statusWrite: "This browser could not store the map. Export a JSON copy.",
+    statusCheckpoint: "The save library could not be read. Restored the last good checkpoint.",
+    statusUnreadable: "Saved data could not be read. An unreadable copy was kept on this browser.",
+    statusTab: "Another tab changed this library. Autosave is paused.",
+    statusTooLarge: "The save library is too large to store. Export it instead.",
+    statusPaused: "Autosave is paused until the other tab’s changes are resolved.",
+    blurb1492: "Crowns and city-states on the eve of the ocean.",
+    blurb1650: "After Westphalia, including a Swedish Baltic and Ottoman Hungary.",
+    blurb1815: "The monarchies of the Vienna settlement.",
+    blurb1914: "Nation-states in the last summer before the Great War.",
+    blurb1938: "The late interwar map, after Anschluss and the Sudetenland.",
+    blurbModern: "A fixed recent atlas, not a live political feed.",
+    disclaimer: "Historical ownership and these fixed game-province boundaries are approximate. Europa Canvas is a painting sandbox, not an authoritative historical reconstruction or a source of real-time political boundaries.",
+  },
+  zh: {
+    eyebrow: "地图沙盘",
+    greaterEurope: "大欧洲",
+    chooseMap: "选择一幅地图",
+    gateLede: "选一个年代，选一个国家，然后给大陆重新上色。没有军队，没有账本，只有这张地图。",
+    move: "移动",
+    paint: "涂色",
+    pick: "吸取",
+    undo: "撤销",
+    redo: "重做",
+    search: "搜索",
+    layers: "图层",
+    save: "存档",
+    menu: "菜单",
+    searchLabel: "搜索国家、省份和城市",
+    searchPlaceholder: "搜索国家、省份、城市",
+    clear: "清除",
+    close: "关闭",
+    listLabel: "列表",
+    countries: "国家",
+    provinces: "省份",
+    createCountry: "新建国家",
+    zoomIn: "放大",
+    zoomOut: "缩小",
+    fit: "全图",
+    fitLabel: "显示整张地图",
+    toolsLabel: "地图工具",
+    mobileTools: "手机工具",
+    dockLabel: "国家与搜索",
+    mapLabel: "大欧洲填色地图",
+    continue: "继续「{title}」· {scenario}",
+    retry: "重试",
+    downloadSave: "下载已保存的地图",
+    loadSlow: "地图加载超时。",
+    loadFail: "地图没有载入。这台浏览器里的存档没有被改动。",
+    noCountry: "还没有选择国家",
+    brushHint: "拖动涂色。双击可填满一片相连区域。",
+    previous: "上一个",
+    locate: "定位",
+    showMore: "显示更多",
+    recent: "最近使用",
+    withoutLand: "没有领土",
+    paintingCount: "正在涂色 · {count} 个省",
+    provinceCount: "{count} 个省",
+    city: "城市",
+    emptySearch: "没有国家、省份或城市匹配「{query}」。",
+    originalName: "原始地名：{name}",
+    owner: "当前归属：{name}",
+    unknown: "未知",
+    capitalVerified: "行政中心：{name}",
+    capitalApprox: "大约的游戏中心：{name}",
+    gameCenter: "游戏中心",
+    combines: "由 {count} 个原始地区合并：{names}。",
+    assign: "涂成当前国家",
+    pickOwner: "吸取它的主人",
+    paintConnected: "涂满相连区域",
+    transfer: "转交该国全部领土",
+    chooseCountry: "先选一个国家再涂色。",
+    noTerritory: "这个国家没有可以定位的领土。",
+    transferTitle: "转交领土",
+    transferBody: "把{from}的每个省份都交给{to}？",
+    thisCountry: "这个国家",
+    currentBrush: "当前画笔",
+    filled: "已填满 {count} 个相连省份",
+    undid: "已撤销：{label}",
+    redid: "已重做：{label}",
+    created: "已新建国家",
+    edited: "已修改国家",
+    restored: "已恢复 {title}。",
+    savedSlot: "已存入槽位 {index}。",
+    importedLibrary: "已导入存档库。可以在存档菜单里撤销这次替换。",
+    restoredLibrary: "已恢复上一次的存档库。",
+    fileTooLarge: "文件太大。",
+    libraryTooLarge: "存档库太大。",
+    badJson: "这个文件不是可读的 JSON。",
+    imageFailed: "图片导出失败。请再试一次。",
+    keptTab: "已保留这个标签页的地图。",
+    conflict: "另一个标签页保存了更新的进度。自动保存已暂停。",
+    keepTab: "保留本页",
+    loadLatest: "载入最新",
+    exportTab: "导出本页",
+    cancel: "取消",
+    overwriteTitle: "覆盖槽位",
+    overwriteBody: "替换「{title}」？",
+    overwrite: "覆盖",
+    saveHere: "存到这里",
+    load: "读取",
+    emptySlot: "空槽位 {index}",
+    editCountry: "编辑国家",
+    createTitle: "新建国家",
+    countryName: "国家名称",
+    countryColor: "国家颜色",
+    saveChanges: "保存修改",
+    paintWith: "用这个国家涂色",
+    guideTitle: "简短说明",
+    guide1: "选一个国家，或新建一个。它会变成你的画笔。",
+    guide2: "点击或拖动涂色。双击，或按住 Shift 再点，会填满一片相连区域。每一笔都可以撤销。",
+    guide3: "拖动地图。滚轮或双指缩放。涂色时按住空格可以暂时拖动。",
+    guide4: "地图保存在这台浏览器里。用 JSON 带走它，或导出 PNG、SVG。",
+    dontShow: "不再显示",
+    startPainting: "开始涂色",
+    saveTitle: "保存这张地图",
+    mapTitle: "地图标题",
+    savesNote: "存档只留在这台浏览器。换设备请导出 JSON。六个命名槽位和自动保存是分开的。",
+    exportMap: "导出这张地图",
+    exportLibrary: "导出整个存档库",
+    importMap: "导入一张地图",
+    importLibrary: "导入存档库",
+    restoreRecovery: "恢复刚才的副本",
+    undoLibrary: "撤销存档库导入",
+    exportTitle: "导出图片",
+    artworkTitle: "作品标题",
+    exportSize: "导出尺寸",
+    countryNames: "国家名称",
+    majorCities: "主要城市",
+    legend: "领土图例",
+    exportNote: "导出的是整张地图自己的标注，不是当前画面上刚好看见的那些字。年代和数据出处总会印上。",
+    downloadPng: "下载 PNG",
+    downloadSvg: "下载 SVG",
+    menuTitle: "菜单",
+    newMap: "新地图",
+    saves: "存档",
+    exportArtwork: "导出图片",
+    shortcuts: "键盘快捷键",
+    about: "关于这张地图",
+    language: "语言",
+    shortcutsTitle: "快捷键",
+    short1: "V 移动，B 涂色，I 从地图吸取国家",
+    short2: "涂色工具下拖动即可上色。按住空格暂时拖动地图。",
+    short3: "右键吸取光标下的国家。",
+    short4: "W 上一个画笔，F 定位当前国家，/ 搜索",
+    short5: "Ctrl 或 Cmd+Z 撤销，Ctrl 或 Cmd+Shift+Z 重做，Ctrl 或 Cmd+S 存档",
+    short6: "Esc 关闭最前面的面板。双击填满相连区域。",
+    layersTitle: "地图图层",
+    layerTerrain: "地形晕渲",
+    layerBorders: "省界",
+    layerCities: "城市",
+    layerProvinceNames: "省份名称",
+    layerCountryNames: "国家名称",
+    closeDialog: "关闭对话框",
+    untitled: "未命名地图",
+    statusBlocked: "这台浏览器禁止了本地存储。请导出 JSON 留一份。",
+    statusQuota: "浏览器存储已满。请先导出地图，以免丢失。",
+    statusWrite: "这台浏览器没能写入地图。请导出 JSON。",
+    statusCheckpoint: "存档库读不出来。已恢复上一份完好的检查点。",
+    statusUnreadable: "存档读不出来。无法识别的原文已留在这台浏览器里。",
+    statusTab: "另一个标签页改过这个存档库。自动保存已暂停。",
+    statusTooLarge: "存档库太大，存不下。请改为导出。",
+    statusPaused: "在处理另一个标签页的更改之前，自动保存已暂停。",
+    blurb1492: "大航海前夕的王冠与城邦。",
+    blurb1650: "威斯特伐利亚之后，包括瑞典的波罗的海和奥斯曼治下的匈牙利。",
+    blurb1815: "维也纳会议之后的君主国。",
+    blurb1914: "大战前夕的民族国家。",
+    blurb1938: "德奥合并与苏台德之后的战间期。",
+    blurbModern: "一幅固定的近期地图，不是实时政治边界。",
+    disclaimer: "历史归属和这些固定的省界都是近似的，方便游玩。这不是严谨的历史复原，也不能当作今天谁控制哪里的依据。",
+  },
+};
+
+const KEY = "europa-canvas-lang";
+let lang = "en";
+const listeners = new Set();
+
+export function getLang() {
+  return lang;
+}
+
+export function t(key, vars) {
+  const table = STRINGS[lang] || STRINGS.en;
+  let text = table[key] ?? STRINGS.en[key] ?? key;
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) {
+      text = text.replaceAll(`{${name}}`, String(value));
+    }
+  }
+  return text;
+}
+
+export function scenarioBlurb(id, fallback) {
+  return t(`blurb${id === "modern" ? "Modern" : id}`) || fallback || "";
+}
+
+function detectLang() {
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved === "zh" || saved === "en") return saved;
+  } catch {
+    /* private mode */
+  }
+  const nav = (navigator.language || "en").toLowerCase();
+  return nav.startsWith("zh") ? "zh" : "en";
+}
+
+export function applyStatic() {
+  document.documentElement.lang = lang === "zh" ? "zh-Hans" : "en";
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAria));
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+    element.setAttribute("title", t(element.dataset.i18nTitle));
+  });
+}
+
+export function setLang(next) {
+  lang = next === "zh" ? "zh" : "en";
+  try {
+    localStorage.setItem(KEY, lang);
+  } catch {
+    /* ignore */
+  }
+  applyStatic();
+  listeners.forEach((listener) => listener());
+}
+
+export function initLang() {
+  lang = detectLang();
+  applyStatic();
+}
+
+export function onLang(listener) {
+  listeners.add(listener);
+}

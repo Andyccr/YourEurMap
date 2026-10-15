@@ -1,4 +1,5 @@
 import { artworkOptions, exportPng, exportSvg, renderArtwork } from "./export-map.js";
+import { getLang, initLang, onLang, scenarioBlurb, setLang, t } from "./i18n.js";
 import {
   MAP_FORMAT,
   applyOwnership,
@@ -66,9 +67,18 @@ let pinch = null;
 const storageApi = createStorage({
   onStatus: (status) => {
     const node = $("status");
-    node.textContent = status.message || "";
+    const codes = {
+      blocked: "statusBlocked",
+      quota: "statusQuota",
+      write: "statusWrite",
+      checkpoint: "statusCheckpoint",
+      unreadable: "statusUnreadable",
+      tab: "statusTab",
+      tooLarge: "statusTooLarge",
+      paused: "statusPaused",
+    };
+    node.textContent = status.tone === "error" ? t(codes[status.code] || "statusWrite") : "";
     node.classList.toggle("error", status.tone === "error");
-    if (status.tone !== "error") node.textContent = "";
   },
   onConflict: (remote) => showConflict(remote),
   onRemote: (library) => {
@@ -80,6 +90,8 @@ const storageApi = createStorage({
 storage = storageApi;
 
 async function boot() {
+  initLang();
+  onLang(() => refreshChrome());
   try {
     state.catalog = await fetchCatalog();
     state.atoms = prepareAtoms(state.catalog);
@@ -102,6 +114,7 @@ async function boot() {
       renderArtwork,
       artworkOptions,
       viewState,
+      setLang,
     };
   } catch (error) {
     showGateError(error);
@@ -138,7 +151,7 @@ function showGate() {
     const resume = document.createElement("button");
     resume.type = "button";
     resume.className = "create-btn";
-    resume.textContent = `Continue “${autosave.title || "Untitled map"}” · ${autosave.scenarioId}`;
+    resume.textContent = t("continue", { title: autosave.title || t("untitled"), scenario: autosave.scenarioId });
     resume.addEventListener("click", () => loadMap(autosave));
     body.append(resume);
   }
@@ -151,7 +164,7 @@ function showGate() {
     const title = document.createElement("strong");
     title.textContent = scenario.label;
     const blurb = document.createElement("span");
-    blurb.textContent = scenario.blurb;
+    blurb.textContent = scenarioBlurb(scenario.id, scenario.blurb);
     button.append(title, blurb);
     button.addEventListener("click", () => beginScenario(scenario.id));
     grid.append(button);
@@ -159,7 +172,7 @@ function showGate() {
   body.append(grid);
   const note = document.createElement("p");
   note.className = "note";
-  note.textContent = state.catalog.disclaimer;
+  note.textContent = t("disclaimer");
   body.append(note);
 }
 
@@ -168,19 +181,17 @@ function showGateError(error) {
   const body = $("gate-body");
   body.replaceChildren();
   const message = document.createElement("p");
-  message.textContent = error?.name === "AbortError"
-    ? "The atlas took too long to load."
-    : "The atlas could not be loaded. Local saves on this browser are untouched.";
+  message.textContent = error?.name === "AbortError" ? t("loadSlow") : t("loadFail");
   const retry = document.createElement("button");
   retry.type = "button";
-  retry.textContent = "Retry";
+  retry.textContent = t("retry");
   retry.addEventListener("click", () => location.reload());
   body.append(message, retry);
   const autosave = storage.library?.autosave;
   if (autosave) {
     const download = document.createElement("button");
     download.type = "button";
-    download.textContent = "Download the saved map";
+    download.textContent = t("downloadSave");
     download.addEventListener("click", () => downloadJson(autosave, "europa-canvas-recovery.json"));
     body.append(download);
   }
@@ -232,7 +243,7 @@ function loadMap(map, { quiet } = {}) {
   state.tool = state.brushId ? "paint" : "move";
   enterPlay();
   if (result.map.camera) view.setCamera(result.map.camera);
-  if (!quiet) toast(`Restored ${state.title}.`);
+  if (!quiet) toast(t("restored", { title: state.title }));
 }
 
 function enterPlay() {
@@ -266,6 +277,16 @@ function viewState() {
     layers: state.layers,
     camera: view.camera,
   };
+}
+
+function refreshChrome() {
+  if (modal) closeModal();
+  if (!$("gate").hidden) showGate();
+  renderBrush();
+  if (!state.loaded) return;
+  $("scenario-label").textContent = `${state.scenario.label} · ${state.title}`;
+  if (!$("dock").hidden) renderList();
+  if (!$("detail").hidden) renderDetail();
 }
 
 function setTool(tool) {
@@ -327,7 +348,7 @@ function locateBox(bbox) {
 function locateCountry(id) {
   const indexes = atomsOfCountry(state.ownership, id);
   if (!indexes.length) {
-    toast("That country has no territory to locate.");
+    toast(t("noTerritory"));
     return;
   }
   let minX = Infinity;
@@ -363,7 +384,7 @@ function startGesture() {
 
 function paintProvince(index) {
   if (!state.brushId) {
-    toast("Choose a country to paint with.");
+    toast(t("chooseCountry"));
     openDock(true);
     return;
   }
@@ -384,7 +405,7 @@ function paintProvince(index) {
 
 function fillConnected(index) {
   if (!state.brushId) {
-    toast("Choose a country to paint with.");
+    toast(t("chooseCountry"));
     openDock(true);
     return;
   }
@@ -407,7 +428,7 @@ function fillConnected(index) {
   if (!changes.length) return;
   view.paintAtoms(changes.map((change) => change.i));
   view.rebuildBorders();
-  const label = names.size > 1 ? `Filled ${names.size} connected provinces` : describePaint(1, [...names][0]);
+  const label = names.size > 1 ? t("filled", { count: names.size }) : describePaint(1, [...names][0]);
   pushHistory(state.history, { label, changes, at: Date.now() });
   toast(label, { offerUndo: true });
   state.selection = index;
@@ -469,7 +490,7 @@ function undo() {
     state.brushId = entry.brushBefore.id;
     state.previousBrushId = entry.brushBefore.previous;
   }
-  toast(`Undid ${entry.label}`);
+  toast(t("undid", { label: entry.label }));
   refreshAfterHistory(entry.changes?.map((change) => change.i) || []);
   scheduleSave();
 }
@@ -483,7 +504,7 @@ function redo() {
     state.brushId = entry.brushAfter.id;
     state.previousBrushId = entry.brushAfter.previous;
   }
-  toast(`Redid ${entry.label}`);
+  toast(t("redid", { label: entry.label }));
   refreshAfterHistory(entry.changes?.map((change) => change.i) || []);
   scheduleSave();
 }
@@ -535,9 +556,9 @@ function transferOwner() {
   const from = state.countries.get(province.owner);
   const to = state.countries.get(state.brushId);
   ask({
-    title: "Transfer territory",
-    body: `Give every province of ${from?.name || "this country"} to ${to?.name || "the current brush"}?`,
-    confirm: "Transfer",
+    title: t("transferTitle"),
+    body: t("transferBody", { from: from?.name || t("thisCountry"), to: to?.name || t("currentBrush") }),
+    confirm: t("transfer"),
   }).then((yes) => {
     if (!yes) return;
     const before = state.ownership.slice();
@@ -564,7 +585,7 @@ function createCountry(name, color) {
     brushBefore,
     brushAfter: brushSnapshot(),
   });
-  toast("Created a country", { offerUndo: true });
+  toast(t("created"), { offerUndo: true });
   scheduleSave();
 }
 
@@ -581,7 +602,7 @@ function editCountry(id, name, color) {
   });
   view.setCountries(state.countries);
   view.paintAll();
-  toast("Edited a country", { offerUndo: true });
+  toast(t("edited"), { offerUndo: true });
   renderBrush();
   renderList();
   renderDetail();
@@ -606,7 +627,7 @@ function renderBrush() {
     node.hidden = false;
     node.replaceChildren();
     const text = document.createElement("span");
-    text.textContent = "No country selected";
+    text.textContent = t("noCountry");
     node.append(text);
     return;
   }
@@ -621,20 +642,20 @@ function renderBrush() {
   name.textContent = country.name;
   const meta = document.createElement("span");
   meta.className = "meta";
-  meta.textContent = "Drag to paint. Double-click fills a region.";
+  meta.textContent = t("brushHint");
   copy.append(name, meta);
   const previous = document.createElement("button");
   previous.type = "button";
-  previous.textContent = "Previous";
+  previous.textContent = t("previous");
   previous.disabled = !state.previousBrushId;
   previous.addEventListener("click", swapBrush);
   const locate = document.createElement("button");
   locate.type = "button";
-  locate.textContent = "Locate";
+  locate.textContent = t("locate");
   locate.addEventListener("click", () => locateCountry(country.id));
   const countries = document.createElement("button");
   countries.type = "button";
-  countries.textContent = "Countries";
+  countries.textContent = t("countries");
   countries.addEventListener("click", () => openDock(true));
   node.append(swatch, copy, previous, locate, countries);
 }
@@ -651,16 +672,16 @@ function renderList() {
     if (!hits.countries.length && !hits.provinces.length && !cities.length) {
       const empty = document.createElement("p");
       empty.className = "empty";
-      empty.textContent = `No countries, provinces, or cities match “${state.query.trim()}”.`;
+      empty.textContent = t("emptySearch", { query: state.query.trim() });
       root.append(empty);
       return;
     }
-    section(root, "Countries");
+    section(root, t("countries"));
     hits.countries.slice(0, state.listLimit).forEach((country) => root.append(countryRow(country, counts)));
-    section(root, "Provinces");
+    section(root, t("provinces"));
     hits.provinces.slice(0, state.listLimit).forEach((province) => root.append(provinceRow(province)));
     if (cities.length) {
-      section(root, "Cities");
+      section(root, t("city"));
       cities.slice(0, 12).forEach((city) => root.append(cityRow(city)));
     }
     if (hits.countries.length > state.listLimit || hits.provinces.length > state.listLimit) moreButton(root);
@@ -673,20 +694,20 @@ function renderList() {
     return;
   }
   if (state.recent.length) {
-    section(root, "Recent brushes");
+    section(root, t("recent"));
     state.recent.forEach((id) => {
       const country = state.countries.get(id);
       if (country) root.append(countryRow(country, counts));
     });
   }
-  section(root, "Countries");
+  section(root, t("countries"));
   const rows = [...state.countries.values()].sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0) || a.name.localeCompare(b.name));
   const active = rows.filter((country) => (counts.get(country.id) || 0) > 0);
   const idle = rows.filter((country) => !(counts.get(country.id) || 0));
   active.slice(0, state.listLimit).forEach((country) => root.append(countryRow(country, counts)));
   if (active.length > state.listLimit) moreButton(root);
   if (idle.length) {
-    section(root, "Without territory");
+    section(root, t("withoutLand"));
     idle.forEach((country) => root.append(countryRow(country, counts)));
   }
 }
@@ -701,7 +722,7 @@ function section(root, text) {
 function moreButton(root) {
   const button = document.createElement("button");
   button.type = "button";
-  button.textContent = "Show more";
+  button.textContent = t("showMore");
   button.addEventListener("click", () => {
     state.listLimit += 40;
     renderList();
@@ -724,7 +745,7 @@ function countryRow(country, counts) {
   name.textContent = country.name;
   const meta = document.createElement("span");
   const count = counts.get(country.id) || 0;
-  meta.textContent = country.id === state.brushId ? `Painting · ${count} provinces` : `${count} provinces`;
+  meta.textContent = country.id === state.brushId ? t("paintingCount", { count }) : t("provinceCount", { count });
   copy.append(name, meta);
   main.append(swatch, copy);
   main.addEventListener("click", () => setBrush(country.id, { closeDock: true }));
@@ -746,7 +767,7 @@ function provinceRow(province) {
   const name = document.createElement("strong");
   name.textContent = province.name;
   const meta = document.createElement("span");
-  meta.textContent = state.countries.get(province.owner)?.name || "Unknown";
+  meta.textContent = state.countries.get(province.owner)?.name || t("unknown");
   copy.append(name, meta);
   button.append(swatch, copy);
   button.addEventListener("click", () => {
@@ -767,7 +788,7 @@ function cityRow(city) {
   const name = document.createElement("strong");
   name.textContent = city.n;
   const meta = document.createElement("span");
-  meta.textContent = "City";
+  meta.textContent = t("city");
   copy.append(name, meta);
   button.append(copy);
   button.addEventListener("click", () => {
@@ -804,33 +825,32 @@ function renderDetail() {
   title.textContent = province.name;
   const local = document.createElement("p");
   local.className = "meta";
-  local.textContent = province.local && province.local !== province.name ? `Original geographic name: ${province.local}` : province.name;
+  local.textContent = province.local && province.local !== province.name ? t("originalName", { name: province.local }) : province.name;
   const owner = state.countries.get(province.owner);
   const ownerLine = document.createElement("p");
-  ownerLine.textContent = `Owner: ${owner?.name || "Unknown"}`;
+  ownerLine.textContent = t("owner", { name: owner?.name || t("unknown") });
   const capital = document.createElement("p");
   const verified = province.capital?.v === 1;
-  capital.textContent = verified
-    ? `Administrative capital: ${province.capital.n}`
-    : `Approximate game center: ${province.capital?.n || "Game center"}`;
+  const capitalName = province.capital?.n && province.capital.n !== "Game center" ? province.capital.n : t("gameCenter");
+  capital.textContent = verified ? t("capitalVerified", { name: capitalName }) : t("capitalApprox", { name: capitalName });
   node.append(title, local, ownerLine, capital);
   if (province.combined) {
     const combined = document.createElement("p");
-    combined.textContent = `Combines ${province.indexes.length} original regions: ${province.aka.slice(0, 8).join(", ") || province.name}.`;
+    combined.textContent = t("combines", { count: province.indexes.length, names: province.aka.slice(0, 8).join(", ") || province.name });
     node.append(combined);
   }
   const same = province.owner === state.brushId;
   const actions = document.createElement("div");
   actions.className = "detail-actions";
   actions.append(
-    actionButton("Assign to current country", assignSelection, same || !state.brushId),
-    actionButton("Pick its current owner", () => setBrush(province.owner), same),
-    actionButton("Paint connected region", paintConnected, same || !state.brushId),
-    actionButton("Transfer owner's territory", transferOwner, same || !state.brushId),
+    actionButton(t("assign"), assignSelection, same || !state.brushId),
+    actionButton(t("pickOwner"), () => setBrush(province.owner), same),
+    actionButton(t("paintConnected"), paintConnected, same || !state.brushId),
+    actionButton(t("transfer"), transferOwner, same || !state.brushId),
   );
   const close = document.createElement("button");
   close.type = "button";
-  close.textContent = "Close";
+  close.textContent = t("close");
   close.addEventListener("click", () => {
     state.selection = null;
     view.setSelected([]);
@@ -869,7 +889,7 @@ function toast(message, { offerUndo = false } = {}) {
   if (offerUndo) {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Undo";
+    button.textContent = t("undo");
     button.addEventListener("click", () => {
       node.remove();
       undo();
@@ -885,20 +905,20 @@ function showConflict(remote) {
   banner.hidden = false;
   banner.replaceChildren();
   const text = document.createElement("span");
-  text.textContent = "Another tab saved newer progress. Autosave is paused.";
+  text.textContent = t("conflict");
   const keep = document.createElement("button");
   keep.type = "button";
-  keep.textContent = "Keep this tab";
+  keep.textContent = t("keepTab");
   keep.addEventListener("click", () => {
     const local = storage.library;
     local.autosave = serializeMap(viewState());
     storage.keepLocal(local);
     banner.hidden = true;
-    toast("Kept this tab’s map.");
+    toast(t("keptTab"));
   });
   const load = document.createElement("button");
   load.type = "button";
-  load.textContent = "Load latest";
+  load.textContent = t("loadLatest");
   load.addEventListener("click", () => {
     storage.adopt(remote);
     if (remote.autosave) loadMap(remote.autosave, { quiet: true });
@@ -906,7 +926,7 @@ function showConflict(remote) {
   });
   const exp = document.createElement("button");
   exp.type = "button";
-  exp.textContent = "Export this tab";
+  exp.textContent = t("exportTab");
   exp.addEventListener("click", () => downloadJson(serializeMap(viewState()), "europa-canvas-local.json"));
   banner.append(text, exp, load, keep);
 }
@@ -925,7 +945,7 @@ function ask({ title, body, confirm }) {
     actions.className = "dialog-actions";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "Cancel";
+    cancel.textContent = t("cancel");
     cancel.addEventListener("click", () => {
       closeModal();
       resolve(false);
@@ -948,7 +968,7 @@ function dialogShell(title) {
   const backdrop = document.createElement("button");
   backdrop.type = "button";
   backdrop.className = "backdrop";
-  backdrop.setAttribute("aria-label", "Close dialog");
+  backdrop.setAttribute("aria-label", t("closeDialog"));
   backdrop.addEventListener("click", closeModal);
   const box = document.createElement("div");
   box.className = "modal";
@@ -980,25 +1000,25 @@ function trapTab(event) {
 }
 
 function countryDialog(existing) {
-  const box = dialogShell(existing ? "Edit country" : "Create a country");
+  const box = dialogShell(existing ? t("editCountry") : t("createTitle"));
   const name = document.createElement("input");
   name.type = "text";
   name.maxLength = 40;
   name.value = existing?.name || "";
-  name.setAttribute("aria-label", "Country name");
+  name.setAttribute("aria-label", t("countryName"));
   const color = document.createElement("input");
   color.type = "color";
   color.value = existing?.color || "#4f6f8a";
-  color.setAttribute("aria-label", "Country color");
+  color.setAttribute("aria-label", t("countryColor"));
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   const cancel = document.createElement("button");
   cancel.type = "button";
-  cancel.textContent = "Cancel";
+  cancel.textContent = t("cancel");
   cancel.addEventListener("click", closeModal);
   const save = document.createElement("button");
   save.type = "button";
-  save.textContent = existing ? "Save changes" : "Paint with this country";
+  save.textContent = existing ? t("saveChanges") : t("paintWith");
   save.addEventListener("click", () => {
     const cleanName = sanitizeName(name.value);
     const cleanColor = sanitizeColor(color.value);
@@ -1013,16 +1033,10 @@ function countryDialog(existing) {
 }
 
 function showOnboarding() {
-  const box = dialogShell("A short guide");
-  const steps = [
-    "Choose a country, or create one. That country becomes your brush.",
-    "Click or drag to paint. Double-click, or Shift-click, fills a connected region. Each stroke is one undo.",
-    "Drag to move the atlas. Scroll or pinch to zoom. Hold Space to pan while painting.",
-    "Maps save in this browser. Export JSON to move them, or export a PNG or SVG.",
-  ];
-  steps.forEach((step) => {
+  const box = dialogShell(t("guideTitle"));
+  ["guide1", "guide2", "guide3", "guide4"].forEach((key) => {
     const p = document.createElement("p");
-    p.textContent = step;
+    p.textContent = t(key);
     box.append(p);
   });
   const label = document.createElement("label");
@@ -1030,10 +1044,10 @@ function showOnboarding() {
   const check = document.createElement("input");
   check.type = "checkbox";
   check.checked = true;
-  label.append(check, document.createTextNode("Don’t show this again"));
+  label.append(check, document.createTextNode(t("dontShow")));
   const close = document.createElement("button");
   close.type = "button";
-  close.textContent = "Start painting";
+  close.textContent = t("startPainting");
   close.addEventListener("click", () => {
     if (check.checked) storage.remember({ onboardingDismissed: true });
     closeModal();
@@ -1043,12 +1057,12 @@ function showOnboarding() {
 }
 
 function saveDialog() {
-  const box = dialogShell("Save this map");
+  const box = dialogShell(t("saveTitle"));
   const name = document.createElement("input");
   name.type = "text";
   name.value = state.title;
   name.maxLength = 80;
-  name.setAttribute("aria-label", "Map title");
+  name.setAttribute("aria-label", t("mapTitle"));
   name.addEventListener("change", () => {
     state.title = sanitizeName(name.value, 80) || state.title;
     $("scenario-label").textContent = `${state.scenario.label} · ${state.title}`;
@@ -1057,29 +1071,29 @@ function saveDialog() {
   box.append(name);
   const note = document.createElement("p");
   note.className = "note";
-  note.textContent = "Saves stay in this browser. Export JSON if you want the map on another device. Six named slots are kept separately from the automatic save.";
+  note.textContent = t("savesNote");
   box.append(note);
   storage.library.slots.forEach((slot, index) => {
     const row = document.createElement("div");
     row.className = "choice";
     const label = document.createElement("span");
-    label.textContent = slot ? `${slot.title} · ${slot.scenarioId}` : `Empty slot ${index + 1}`;
+    label.textContent = slot ? `${slot.title} · ${slot.scenarioId}` : t("emptySlot", { index: index + 1 });
     const save = document.createElement("button");
     save.type = "button";
-    save.textContent = slot ? "Overwrite" : "Save here";
+    save.textContent = slot ? t("overwrite") : t("saveHere");
     save.addEventListener("click", async () => {
       if (slot) {
-        const yes = await ask({ title: "Overwrite slot", body: `Replace “${slot.title}”?`, confirm: "Overwrite" });
+        const yes = await ask({ title: t("overwriteTitle"), body: t("overwriteBody", { title: slot.title }), confirm: t("overwrite") });
         if (!yes) return;
       }
       state.title = sanitizeName(name.value, 80) || state.title;
       storage.saveSlot(index, serializeMap(viewState()));
-      toast(`Saved to slot ${index + 1}.`);
+      toast(t("savedSlot", { index: index + 1 }));
       saveDialog();
     });
     const load = document.createElement("button");
     load.type = "button";
-    load.textContent = "Load";
+    load.textContent = t("load");
     load.disabled = !slot;
     load.addEventListener("click", () => {
       closeModal();
@@ -1091,21 +1105,21 @@ function saveDialog() {
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   actions.append(
-    actionButton("Export this map", () => downloadJson(serializeMap(viewState()), "europa-canvas-map.json"), false),
-    actionButton("Export save library", () => downloadJson(storage.library, "europa-canvas-library.json"), false),
-    actionButton("Import a map", () => pickJson((data) => importMap(data)), false),
-    actionButton("Import a library", () => pickJson((data) => importLibrary(data)), false),
+    actionButton(t("exportMap"), () => downloadJson(serializeMap(viewState()), "europa-canvas-map.json"), false),
+    actionButton(t("exportLibrary"), () => downloadJson(storage.library, "europa-canvas-library.json"), false),
+    actionButton(t("importMap"), () => pickJson((data) => importMap(data)), false),
+    actionButton(t("importLibrary"), () => pickJson((data) => importLibrary(data)), false),
   );
   if (storage.library.recovery) {
-    actions.append(actionButton("Restore recovery copy", () => {
+    actions.append(actionButton(t("restoreRecovery"), () => {
       closeModal();
       loadMap(storage.library.recovery);
     }, false));
   }
   if (storage.library.libraryBackup) {
-    actions.append(actionButton("Undo library import", () => {
+    actions.append(actionButton(t("undoLibrary"), () => {
       storage.restoreLibraryBackup();
-      toast("Restored the previous save library.");
+      toast(t("restoredLibrary"));
       closeModal();
     }, false));
   }
@@ -1113,34 +1127,34 @@ function saveDialog() {
 }
 
 function exportDialog() {
-  const box = dialogShell("Export artwork");
+  const box = dialogShell(t("exportTitle"));
   const title = document.createElement("input");
   title.type = "text";
   title.value = state.title;
   title.maxLength = 80;
-  title.setAttribute("aria-label", "Artwork title");
+  title.setAttribute("aria-label", t("artworkTitle"));
   const size = document.createElement("select");
-  size.setAttribute("aria-label", "Export size");
+  size.setAttribute("aria-label", t("exportSize"));
   ["2400x1600", "3600x2400"].forEach((value) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value.replace("x", " × ");
     size.append(option);
   });
-  const names = check("Country names", false);
-  const cities = check("Major cities", true);
-  const legend = check("Territory legend", true);
+  const names = check(t("countryNames"), false);
+  const cities = check(t("majorCities"), true);
+  const legend = check(t("legend"), true);
   const note = document.createElement("p");
   note.className = "note";
-  note.textContent = "Exports draw the full atlas, not only the labels currently on screen. Scenario and data attribution are always included.";
+  note.textContent = t("exportNote");
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   const png = document.createElement("button");
   png.type = "button";
-  png.textContent = "Download PNG";
+  png.textContent = t("downloadPng");
   const svg = document.createElement("button");
   svg.type = "button";
-  svg.textContent = "Download SVG";
+  svg.textContent = t("downloadSvg");
   const options = () => ({
     ...artworkOptions(viewState()),
     title: sanitizeName(title.value, 80) || "Europa Canvas",
@@ -1149,7 +1163,7 @@ function exportDialog() {
     cities: cities.querySelector("input").checked,
     legend: legend.querySelector("input").checked,
   });
-  png.addEventListener("click", () => exportPng(options()).catch(() => toast("The image export failed. Try again.")));
+  png.addEventListener("click", () => exportPng(options()).catch(() => toast(t("imageFailed"))));
   svg.addEventListener("click", () => exportSvg(options()));
   actions.append(svg, png);
   box.append(title, size, names, cities, legend, note, actions);
@@ -1170,16 +1184,16 @@ function layersPopover() {
     closeModal();
     return;
   }
-  const box = dialogShell("Map layers");
+  const box = dialogShell(t("layersTitle"));
   const fields = [
-    ["terrain", "Terrain shading"],
-    ["provinceBorders", "Province borders"],
-    ["cities", "Cities"],
-    ["provinceNames", "Province names"],
-    ["countryNames", "Country names"],
+    ["terrain", "layerTerrain"],
+    ["provinceBorders", "layerBorders"],
+    ["cities", "layerCities"],
+    ["provinceNames", "layerProvinceNames"],
+    ["countryNames", "layerCountryNames"],
   ];
   fields.forEach(([key, label]) => {
-    const row = check(label, state.layers[key] !== false && Boolean(state.layers[key] || key === "terrain" || key === "provinceBorders" || key === "cities"));
+    const row = check(t(label), Boolean(state.layers[key]));
     row.querySelector("input").checked = Boolean(state.layers[key]);
     row.querySelector("input").addEventListener("change", (event) => {
       state.layers[key] = event.target.checked;
@@ -1191,43 +1205,51 @@ function layersPopover() {
 }
 
 function menuDialog() {
-  const box = dialogShell("Menu");
+  const box = dialogShell(t("menuTitle"));
   const actions = document.createElement("div");
   actions.className = "detail-actions";
+  const language = document.createElement("div");
+  language.className = "dialog-actions";
+  const label = document.createElement("span");
+  label.textContent = t("language");
+  const english = document.createElement("button");
+  english.type = "button";
+  english.textContent = "English";
+  english.setAttribute("aria-pressed", String(getLang() === "en"));
+  english.addEventListener("click", () => setLang("en"));
+  const chinese = document.createElement("button");
+  chinese.type = "button";
+  chinese.textContent = "中文";
+  chinese.setAttribute("aria-pressed", String(getLang() === "zh"));
+  chinese.addEventListener("click", () => setLang("zh"));
+  language.append(label, english, chinese);
   actions.append(
-    actionButton("New map", () => {
+    actionButton(t("newMap"), () => {
       closeModal();
       showGate();
     }, false),
-    actionButton("Saves", () => saveDialog(), false),
-    actionButton("Export artwork", () => exportDialog(), false),
-    actionButton("Keyboard shortcuts", () => shortcutDialog(), false),
-    actionButton("About this atlas", () => aboutDialog(), false),
+    actionButton(t("saves"), () => saveDialog(), false),
+    actionButton(t("exportArtwork"), () => exportDialog(), false),
+    actionButton(t("shortcuts"), () => shortcutDialog(), false),
+    actionButton(t("about"), () => aboutDialog(), false),
   );
-  box.append(actions);
+  box.append(language, actions);
 }
 
 function shortcutDialog() {
-  const box = dialogShell("Shortcuts");
-  const lines = [
-    "V move, B paint, I pick a country from the map",
-    "Drag paints while the paint tool is active. Hold Space to pan.",
-    "Right-click picks the country under the cursor.",
-    "W previous brush, F locate the current country, / search",
-    "Ctrl or Cmd Z undo, Ctrl or Cmd Shift Z redo, Ctrl or Cmd S save",
-    "Escape closes the panel in front.",
-  ];
+  const box = dialogShell(t("shortcutsTitle"));
+  const lines = ["short1", "short2", "short3", "short4", "short5", "short6"];
   lines.forEach((line) => {
     const p = document.createElement("p");
-    p.textContent = line;
+    p.textContent = t(line);
     box.append(p);
   });
 }
 
 function aboutDialog() {
-  const box = dialogShell("About this atlas");
+  const box = dialogShell(t("about"));
   const p = document.createElement("p");
-  p.textContent = state.catalog.disclaimer;
+  p.textContent = t("disclaimer");
   const a = document.createElement("p");
   a.className = "note";
   a.textContent = state.catalog.attribution;
@@ -1246,7 +1268,7 @@ function importMap(data) {
 
 function importLibrary(data) {
   if (JSON.stringify(data).length > 8_000_000) {
-    toast("That library is too large.");
+    toast(t("libraryTooLarge"));
     return;
   }
   const result = storage.validateLibrary(data, state.catalog);
@@ -1255,7 +1277,7 @@ function importLibrary(data) {
     return;
   }
   storage.replaceLibrary(result.library);
-  toast("Imported the save library. You can undo this from the save menu.");
+    toast(t("importedLibrary"));
   if (result.library.autosave) loadMap(result.library.autosave, { quiet: true });
 }
 
@@ -1267,13 +1289,13 @@ function pickJson(done) {
     const file = input.files?.[0];
     if (!file) return;
     if (file.size > 8_000_000) {
-      toast("That file is too large.");
+      toast(t("fileTooLarge"));
       return;
     }
     try {
       done(JSON.parse(await file.text()));
     } catch {
-      toast("That file could not be read as JSON.");
+      toast(t("badJson"));
     }
   });
   input.click();
@@ -1407,6 +1429,7 @@ let pointerFrame = 0;
 
 function onPointerDown(event) {
   if (!state.loaded) return;
+  view.setDeferBorders(true);
   view.refreshBox();
   try { $("map").setPointerCapture(event.pointerId); } catch { /* pointer already released */ }
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1501,6 +1524,7 @@ function onPointerUp(event) {
   if (pointers.size === 0) {
     pan = null;
     $("map").classList.remove("is-dragging");
+    view.setDeferBorders(false);
     endGesture();
     view.setHover([]);
     view.settle();

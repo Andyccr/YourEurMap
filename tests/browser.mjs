@@ -20,6 +20,7 @@ async function settle(page) {
 const desktop = await browser.newPage();
 desktop.on("pageerror", (error) => failures.push(`pageerror ${error.message}`));
 await desktop.setViewport({ width: 1280, height: 800 });
+await desktop.evaluateOnNewDocument(() => localStorage.setItem("europa-canvas-lang", "en"));
 await desktop.goto(base, { waitUntil: "networkidle0" });
 await settle(desktop);
 check("gate visible", await desktop.$eval("#gate h2", (node) => node.textContent.includes("Europa Canvas")));
@@ -97,11 +98,16 @@ check("png export size", artwork.w === 2400 && artwork.h === 1600, `${artwork.w}
 const { writeFileSync } = await import("node:fs");
 writeFileSync("/tmp/europa-export.jpg", Buffer.from(artwork.url.split(",")[1], "base64"));
 
+await desktop.click("#open-search");
+await desktop.waitForSelector("#search", { visible: true });
 await desktop.type("#search", "Paris");
 const searchText = await desktop.$eval("#list", (node) => node.innerText);
 check("search lists Paris", /Paris/i.test(searchText));
 check("search keeps country tab selected", await desktop.$eval("#tab-countries", (node) => node.getAttribute("aria-selected") === "true"));
 await desktop.click("#clear-search");
+await desktop.evaluate(() => window.__europa.setLang("zh"));
+check("language switch", await desktop.$eval("#open-save", (node) => node.textContent === "存档"));
+await desktop.evaluate(() => window.__europa.setLang("en"));
 
 await desktop.click("#open-save");
 check("save dialog", await desktop.$eval(".modal h3", (node) => /save/i.test(node.textContent)));
@@ -112,6 +118,7 @@ await desktop.screenshot({ path: shot });
 console.log("screenshot", shot);
 
 const mobile = await browser.newPage();
+await mobile.evaluateOnNewDocument(() => localStorage.setItem("europa-canvas-lang", "en"));
 await mobile.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
 await mobile.goto(base, { waitUntil: "networkidle0" });
 await settle(mobile);
