@@ -87,6 +87,8 @@ python3 -m http.server 4173
 | Pick，`I` | 吸取光标下的国家，并开始用它涂色 |
 | 右键 | 同样是吸取国家 |
 | 按住空格 | 暂时改成拖动，松开后回到原来的工具 |
+
+拖动和双指缩放时，画面跟着手移动，松手后再把省份重画清楚。
 | `W` | 换回上一个国家 |
 | `F` | 把地图移到当前国家，不改变画笔 |
 | `/` | 打开搜索并聚焦 |
@@ -271,6 +273,8 @@ To change it, open the menu, choose Language, then 中文 or English. The choice
 | Pick, `I` | Take the country under the cursor and paint with it |
 | Right-click | Pick, same as the Pick tool |
 | Hold Space | Pan until the key is released |
+
+While you drag or pinch, the picture follows your hand and is redrawn sharply when you let go.
 | `W` | Switch back to the previous country |
 | `F` | Frame the current country without changing the brush |
 | `/` | Open search and focus it |

@@ -327,7 +327,7 @@ function provinceAt(index, groups = groupsNow()) {
 }
 
 function zoomLimits() {
-  const rect = $("map").getBoundingClientRect();
+  const rect = $("stage").getBoundingClientRect();
   const ratio = rect.height / Math.max(rect.width, 1) || 1;
   return {
     minW: state.catalog.w / 28,
@@ -336,7 +336,7 @@ function zoomLimits() {
 }
 
 function locateBox(bbox) {
-  const rect = $("map").getBoundingClientRect();
+  const rect = $("stage").getBoundingClientRect();
   const ratio = rect.height / Math.max(rect.width, 1);
   const fitted = fitBounds(bbox, ratio);
   const limits = zoomLimits();
@@ -1407,14 +1407,15 @@ function flushWheel() {
 }
 
 function zoomAtCenter(factor) {
-  const rect = $("map").getBoundingClientRect();
+  const rect = $("stage").getBoundingClientRect();
   zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
 }
 
 function zoomAt(clientX, clientY, factor) {
+  view.setLive(true);
   view.refreshBox();
   const before = view.screenToMap(clientX, clientY);
-  const rect = $("map").getBoundingClientRect();
+  const rect = $("stage").getBoundingClientRect();
   const ratio = rect.height / Math.max(rect.width, 1);
   const limits = zoomLimits();
   const nextW = clampCamera({ ...view.camera, w: view.camera.w * factor, h: view.camera.w * factor * ratio }, state.catalog.w, state.catalog.h, limits.minW, limits.maxW).w;
@@ -1435,6 +1436,7 @@ function onPointerDown(event) {
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (pointers.size >= 2) {
     rollbackGesture();
+    view.setLive(true);
     const [a, b] = [...pointers.values()];
     pinch = {
       dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
@@ -1463,6 +1465,7 @@ function onPointerDown(event) {
     if (index >= 0) paintProvince(index);
     return;
   }
+  view.setLive(true);
   pan = { x: event.clientX, y: event.clientY, cx: view.camera.cx, cy: view.camera.cy };
   $("map").classList.add("is-dragging");
 }
@@ -1481,7 +1484,7 @@ function flushPointer() {
     const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
     const midX = (a.x + b.x) / 2;
     const midY = (a.y + b.y) / 2;
-    const rect = $("map").getBoundingClientRect();
+    const rect = $("stage").getBoundingClientRect();
     const ratio = rect.height / Math.max(rect.width, 1);
     const limits = zoomLimits();
     const nextW = clampCamera(
@@ -1493,7 +1496,6 @@ function flushPointer() {
     ).w;
     const relX = (midX - rect.left) / rect.width;
     const relY = (midY - rect.top) / rect.height;
-    view.refreshBox();
     view.setCamera({
       w: nextW,
       cx: pinch.map.x - (relX - 0.5) * nextW,
@@ -1510,7 +1512,7 @@ function flushPointer() {
   }
   if (pan) {
     const point = [...pointers.values()][0];
-    const rect = $("map").getBoundingClientRect();
+    const rect = $("stage").getBoundingClientRect();
     const dx = ((point.x - pan.x) / rect.width) * view.camera.w;
     const dy = ((point.y - pan.y) / rect.height) * (view.camera.h || view.camera.w);
     view.setCamera({ cx: pan.cx - dx, cy: pan.cy - dy, w: view.camera.w });
