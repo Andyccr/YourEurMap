@@ -11,8 +11,11 @@
 <body>
   <div id="app">
     <div id="stage">
-      <svg id="map" role="img" data-i18n-aria="mapLabel" aria-label="Greater Europe painting map"></svg>
-      <div id="labels" aria-hidden="true"></div>
+      <div id="map-layer">
+        <canvas id="map" data-i18n-aria="mapLabel" aria-label="Greater Europe painting map"></canvas>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+        <div id="labels" aria-hidden="true"></div>
+      </div>
     </div>
 
     <header id="topbar" data-obstacle>
