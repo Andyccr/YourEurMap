@@ -1,216 +1,272 @@
 import { layoutAnnotations, textWidth } from "./labels.js";
 import { visualProvinces } from "./model.js";
 
-function ringsToPath(rings) {
-  let path = "";
+const SEA = "#d5e0db";
+const MAX_DPR = 2;
+
+function ringPath(rings) {
+  const path = new Path2D();
   for (const ring of rings) {
     if (!ring || ring.length < 4) continue;
-    path += `M${ring[0][0]} ${ring[0][1]}`;
-    for (let i = 1; i < ring.length; i += 1) path += `L${ring[i][0]} ${ring[i][1]}`;
-    path += "Z";
+    path.moveTo(ring[0][0], ring[0][1]);
+    for (let i = 1; i < ring.length; i += 1) path.lineTo(ring[i][0], ring[i][1]);
+    path.closePath();
   }
   return path;
 }
 
-export function createMapView(svg, catalog, atoms) {
+export function createMapView(canvas, catalog, atoms) {
   const { w: mapW, h: mapH } = catalog;
-  svg.setAttribute("viewBox", `0 0 ${mapW} ${mapH}`);
-  svg.innerHTML = "";
-  const ns = "http://www.w3.org/2000/svg";
-  const sea = document.createElementNS(ns, "rect");
-  sea.setAttribute("class", "sea");
-  sea.setAttribute("x", "0");
-  sea.setAttribute("y", "0");
-  sea.setAttribute("width", String(mapW));
-  sea.setAttribute("height", String(mapH));
-  svg.append(sea);
-
-  const defs = document.createElementNS(ns, "defs");
-  const mask = document.createElementNS(ns, "mask");
-  mask.id = "land-mask";
-  const maskShade = document.createElementNS(ns, "rect");
-  maskShade.setAttribute("width", String(mapW));
-  maskShade.setAttribute("height", String(mapH));
-  maskShade.setAttribute("fill", "black");
-  const maskLand = document.createElementNS(ns, "path");
-  maskLand.setAttribute("fill", "white");
-  maskLand.setAttribute("fill-rule", "evenodd");
-  mask.append(maskShade, maskLand);
-  defs.append(mask);
-  svg.append(defs);
-
-  const terrain = document.createElementNS(ns, "image");
-  terrain.id = "terrain";
-  terrain.setAttribute("x", "0");
-  terrain.setAttribute("y", "0");
-  terrain.setAttribute("width", String(mapW));
-  terrain.setAttribute("height", String(mapH));
-  terrain.setAttribute("preserveAspectRatio", "none");
-  terrain.setAttribute("mask", "url(#land-mask)");
-  if (catalog.terrain) terrain.setAttribute("href", catalog.terrain);
-  svg.append(terrain);
-
-  const atomLayer = document.createElementNS(ns, "g");
-  atomLayer.id = "atoms";
-  svg.append(atomLayer);
-  const provinceBorders = document.createElementNS(ns, "path");
-  provinceBorders.id = "province-borders";
-  const nationalBorders = document.createElementNS(ns, "path");
-  nationalBorders.id = "national-borders";
-  const hover = document.createElementNS(ns, "path");
-  hover.id = "hover-ring";
-  const selected = document.createElementNS(ns, "path");
-  selected.id = "selected-ring";
-  svg.append(provinceBorders, nationalBorders, hover, selected);
-
-  const paths = atoms.map((atom) => ringsToPath(atom.rings));
-  maskLand.setAttribute("d", paths.join(""));
-  const elements = paths.map((d, index) => {
-    const path = document.createElementNS(ns, "path");
-    path.setAttribute("d", d);
-    path.setAttribute("fill-rule", "evenodd");
-    path.classList.add("atom");
-    atomLayer.append(path);
-    return path;
-  });
+  const layer = canvas.parentElement;
+  const overlay = document.getElementById("overlay");
+  const labelRoot = document.getElementById("labels");
+  const stage = document.getElementById("stage");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const octx = overlay.getContext("2d");
+  const paths = atoms.map((atom) => ringPath(atom.rings));
   const edges = catalog.edges.map((edge) => ({
     a: edge.a,
     b: edge.b,
-    d: edge.d,
+    path: new Path2D(edge.d),
     same: atoms[edge.a].gid === atoms[edge.b].gid,
   }));
-
   const grid = buildGrid(atoms, mapW, mapH);
+  const colors = new Array(atoms.length);
   let ownership = catalog.scenarios[0].owners.slice();
   let countries = new Map();
-  let camera = { cx: mapW / 2, cy: mapH / 2, w: mapW };
-  let layers = { terrain: true, provinceBorders: true, cities: true, provinceNames: false, countryNames: false };
-  let labelFrame = 0;
-  let borderFrame = 0;
-  let cullFrame = 0;
+  let camera = { cx: mapW / 2, cy: mapH / 2, w: mapW, h: mapH };
+  let rendered = null;
+  let live = false;
   let deferBorders = false;
+  let layers = { terrain: true, provinceBorders: true, cities: true, provinceNames: false, countryNames: false };
   let placedLabels = [];
-  const labelRoot = document.getElementById("labels");
+  let labelFrame = 0;
+  let drawFrame = 0;
+  let borderCache = null;
   const box = { left: 0, top: 0, width: 1, height: 1 };
+  const terrainImg = new Image();
+  if (catalog.terrain) {
+    terrainImg.decoding = "async";
+    terrainImg.onload = () => { if (!live) draw(); };
+    terrainImg.src = catalog.terrain;
+  }
 
   function colorOf(id) {
     return countries.get(id)?.color || "#8d8376";
   }
 
-  function paintAtom(index) {
-    const color = colorOf(ownership[index]);
-    const element = elements[index];
-    if (element.dataset.color === color) return;
-    element.dataset.color = color;
-    element.setAttribute("fill", color);
-    element.setAttribute("stroke", color);
-  }
-
-  function paintAll() {
-    for (let i = 0; i < elements.length; i += 1) paintAtom(i);
-  }
-
-  function rebuildBorders() {
-    const province = [];
-    const national = [];
-    for (let i = 0; i < edges.length; i += 1) {
-      const edge = edges[i];
-      if (ownership[edge.a] !== ownership[edge.b]) national.push(edge.d);
-      else if (!edge.same) province.push(edge.d);
-    }
-    provinceBorders.setAttribute("d", province.join(""));
-    nationalBorders.setAttribute("d", national.join(""));
-  }
-
-  function scheduleBorders() {
-    if (deferBorders) return;
-    cancelAnimationFrame(borderFrame);
-    borderFrame = requestAnimationFrame(rebuildBorders);
-  }
-
-  function setHover(indexes) {
-    hover.setAttribute("d", indexes?.length ? indexes.map((index) => paths[index]).join("") : "");
-  }
-
-  function setSelected(indexes) {
-    selected.setAttribute("d", indexes?.length ? indexes.map((index) => paths[index]).join("") : "");
+  function dpr() {
+    return Math.min(window.devicePixelRatio || 1, MAX_DPR);
   }
 
   function refreshBox() {
-    const rect = svg.getBoundingClientRect();
+    const rect = stage.getBoundingClientRect();
     box.left = rect.left;
     box.top = rect.top;
     box.width = rect.width || 1;
     box.height = rect.height || 1;
   }
 
-  function applyCamera() {
+  function ensureHeight() {
     const ratio = box.height > 1 ? box.height / box.width : mapH / mapW;
     camera.h = camera.w * ratio;
-    const x = camera.cx - camera.w / 2;
-    const y = camera.cy - camera.h / 2;
-    svg.setAttribute("viewBox", `${x} ${y} ${camera.w} ${camera.h}`);
-    positionLabels();
   }
 
-  function positionLabels() {
-    if (!placedLabels.length) return;
+  function mapTransform() {
     const left = camera.cx - camera.w / 2;
     const top = camera.cy - camera.h / 2;
     const sx = box.width / camera.w;
-    const sy = box.height / (camera.h || 1);
-    for (let i = 0; i < placedLabels.length; i += 1) {
-      const item = placedLabels[i];
-      const px = (item.x - left) * sx;
-      const py = (item.y - top) * sy;
-      const hidden = px < -40 || py < -20 || px > box.width + 40 || py > box.height + 20;
-      item.node.style.left = `${px}px`;
-      item.node.style.top = `${py}px`;
-      item.node.style.visibility = hidden ? "hidden" : "visible";
+    const sy = box.height / camera.h;
+    const ratio = dpr();
+    return { left, top, sx, sy, ratio };
+  }
+
+  function setMapTransform(context, m) {
+    context.setTransform(m.ratio * m.sx, 0, 0, m.ratio * m.sy, -m.left * m.ratio * m.sx, -m.top * m.ratio * m.sy);
+  }
+
+  function invalidateBorders() {
+    borderCache = null;
+  }
+
+  function ensureBorders() {
+    if (borderCache) return borderCache;
+    const province = new Path2D();
+    const national = new Path2D();
+    for (let i = 0; i < edges.length; i += 1) {
+      const edge = edges[i];
+      if (ownership[edge.a] !== ownership[edge.b]) national.addPath(edge.path);
+      else if (!edge.same) province.addPath(edge.path);
+    }
+    borderCache = { province, national };
+    return borderCache;
+  }
+
+  function sizeCanvases() {
+    const ratio = dpr();
+    const width = Math.max(1, Math.round(box.width * ratio));
+    const height = Math.max(1, Math.round(box.height * ratio));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      overlay.width = width;
+      overlay.height = height;
     }
   }
 
-  function cull() {
-    const margin = camera.w * 0.08;
-    const minX = camera.cx - camera.w / 2 - margin;
-    const maxX = camera.cx + camera.w / 2 + margin;
-    const minY = camera.cy - camera.h / 2 - margin;
-    const maxY = camera.cy + camera.h / 2 + margin;
-    const zoomed = camera.w < mapW * 0.72;
+  function draw() {
+    refreshBox();
+    ensureHeight();
+    sizeCanvases();
+    const m = mapTransform();
+    ctx.setTransform(m.ratio, 0, 0, m.ratio, 0, 0);
+    ctx.fillStyle = SEA;
+    ctx.fillRect(0, 0, box.width, box.height);
+    setMapTransform(ctx, m);
+    const showTerrain = layers.terrain !== false && terrainImg.complete && terrainImg.naturalWidth > 0;
+    if (showTerrain) ctx.drawImage(terrainImg, 0, 0, mapW, mapH);
+    const maxX = m.left + camera.w;
+    const maxY = m.top + camera.h;
+    ctx.globalAlpha = showTerrain ? 0.88 : 1;
     for (let i = 0; i < atoms.length; i += 1) {
-      const box = atoms[i].b;
-      const visible = !zoomed || (box[2] >= minX && box[0] <= maxX && box[3] >= minY && box[1] <= maxY);
-      elements[i].style.display = visible ? "" : "none";
+      const bounds = atoms[i].b;
+      if (bounds[2] < m.left || bounds[0] > maxX || bounds[3] < m.top || bounds[1] > maxY) continue;
+      colors[i] = colorOf(ownership[i]);
+      ctx.fillStyle = colors[i];
+      ctx.fill(paths[i], "evenodd");
     }
+    ctx.globalAlpha = 1;
+    if (!deferBorders) {
+      const borders = ensureBorders();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      if (layers.provinceBorders !== false) {
+        ctx.strokeStyle = "rgba(36, 28, 20, 0.33)";
+        ctx.lineWidth = 0.8 / m.sx;
+        ctx.stroke(borders.province);
+      }
+      ctx.strokeStyle = "#24180f";
+      ctx.lineWidth = 2.15 / m.sx;
+      ctx.stroke(borders.national);
+    }
+    rendered = { cx: camera.cx, cy: camera.cy, w: camera.w, h: camera.h };
+    layer.style.transform = "";
+    drawOverlay();
   }
 
-  function scheduleCull() {
-    cancelAnimationFrame(cullFrame);
-    cullFrame = requestAnimationFrame(cull);
+  function scheduleDraw() {
+    if (live || drawFrame) return;
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = 0;
+      if (!live) draw();
+    });
   }
+
+  function stamp(index) {
+    const m = mapTransform();
+    ctx.save();
+    setMapTransform(ctx, m);
+    ctx.beginPath();
+    ctx.clip(paths[index], "evenodd");
+    const showTerrain = layers.terrain !== false && terrainImg.complete && terrainImg.naturalWidth > 0;
+    if (showTerrain) ctx.drawImage(terrainImg, 0, 0, mapW, mapH);
+    else {
+      ctx.fillStyle = SEA;
+      ctx.fillRect(atoms[index].b[0], atoms[index].b[1], atoms[index].b[2], atoms[index].b[3]);
+    }
+    ctx.globalAlpha = showTerrain ? 0.88 : 1;
+    ctx.fillStyle = colors[index];
+    ctx.fill(paths[index], "evenodd");
+    ctx.restore();
+  }
+
+  function paintAtoms(indexes) {
+    let changed = false;
+    for (let n = 0; n < indexes.length; n += 1) {
+      const index = indexes[n];
+      const next = colorOf(ownership[index]);
+      if (colors[index] === next) continue;
+      colors[index] = next;
+      changed = true;
+      if (!live && rendered) stamp(index);
+    }
+    if (changed) invalidateBorders();
+    if (changed && !deferBorders && !live) scheduleDraw();
+  }
+
+  function paintAll() {
+    for (let i = 0; i < atoms.length; i += 1) colors[i] = colorOf(ownership[i]);
+    invalidateBorders();
+    if (!live) draw();
+  }
+
+  function updateLiveTransform() {
+    if (!rendered) {
+      draw();
+      return;
+    }
+    ensureHeight();
+    const scale = rendered.w / camera.w;
+    const left0 = rendered.cx - rendered.w / 2;
+    const top0 = rendered.cy - rendered.h / 2;
+    const left1 = camera.cx - camera.w / 2;
+    const top1 = camera.cy - camera.h / 2;
+    const tx = ((left0 - left1) / camera.w) * box.width;
+    const ty = ((top0 - top1) / camera.h) * box.height;
+    layer.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+
+  function drawOverlay() {
+    const ratio = dpr();
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!hoverIndexes.length && !selectedIndexes.length) return;
+    const m = mapTransform();
+    setMapTransform(octx, m);
+    octx.lineJoin = "round";
+    octx.lineWidth = 2.2 / m.sx;
+    octx.strokeStyle = "#f7f1e4";
+    for (let i = 0; i < hoverIndexes.length; i += 1) octx.stroke(paths[hoverIndexes[i]]);
+    octx.setLineDash([6 / m.sx, 4 / m.sx]);
+    octx.lineWidth = 2.4 / m.sx;
+    for (let i = 0; i < selectedIndexes.length; i += 1) octx.stroke(paths[selectedIndexes[i]]);
+    octx.setLineDash([]);
+  }
+
+  let hoverIndexes = [];
+  let selectedIndexes = [];
 
   function obstacles() {
     return [...document.querySelectorAll("[data-obstacle]")].filter((element) => !element.hidden && element.getClientRects().length).map((element) => {
       const rect = element.getBoundingClientRect();
-      const stage = svg.getBoundingClientRect();
+      const origin = stage.getBoundingClientRect();
       return {
-        x: rect.left - stage.left - 6,
-        y: rect.top - stage.top - 6,
+        x: rect.left - origin.left - 6,
+        y: rect.top - origin.top - 6,
         w: rect.width + 12,
         h: rect.height + 12,
       };
     });
   }
 
+  function toScreen(x, y) {
+    const left = camera.cx - camera.w / 2;
+    const top = camera.cy - camera.h / 2;
+    return {
+      x: ((x - left) / camera.w) * box.width,
+      y: ((y - top) / camera.h) * box.height,
+    };
+  }
+
   function updateLabels() {
-    if (!labelRoot) return;
+    if (!labelRoot || live) return;
     refreshBox();
+    ensureHeight();
     if (box.width < 20) return;
     const zoom = camera.w / mapW;
     const items = [];
     if (layers.cities !== false) {
       const rankLimit = zoom > 0.72 ? 0 : zoom > 0.42 ? 1 : zoom > 0.22 ? 2 : 3;
-      const max = zoom > 0.72 ? 12 : zoom > 0.42 ? 24 : 36;
       for (const city of catalog.cities) {
         if (city.r > rankLimit) continue;
         const screen = toScreen(city.x, city.y);
@@ -225,19 +281,18 @@ export function createMapView(svg, catalog, atoms) {
           rank: city.r,
           priority: city.p || 0,
           kind: "city",
-          max,
         });
       }
     }
     if (layers.countryNames) {
       const groups = new Map();
       ownership.forEach((id, index) => {
-        const box = atoms[index].b;
-        const group = groups.get(id) || { id, area: 0, x: 0, y: 0 };
+        const bounds = atoms[index].b;
         const area = atoms[index].area || 1;
+        const group = groups.get(id) || { id, area: 0, x: 0, y: 0 };
         group.area += area;
-        group.x += ((box[0] + box[2]) / 2) * area;
-        group.y += ((box[1] + box[3]) / 2) * area;
+        group.x += ((bounds[0] + bounds[2]) / 2) * area;
+        group.y += ((bounds[1] + bounds[3]) / 2) * area;
         groups.set(id, group);
       });
       for (const group of groups.values()) {
@@ -296,8 +351,7 @@ export function createMapView(svg, catalog, atoms) {
         kind: "sea",
       });
     }
-    const bounds = { x: 8, y: 8, w: box.width - 16, h: box.height - 16 };
-    const placed = layoutAnnotations(items, bounds, {
+    const placed = layoutAnnotations(items, { x: 8, y: 8, w: box.width - 16, h: box.height - 16 }, {
       max: zoom > 0.72 ? 14 : zoom > 0.4 ? 24 : 32,
       gap: 8,
       obstacles: obstacles(),
@@ -305,37 +359,37 @@ export function createMapView(svg, catalog, atoms) {
     const same = placed.length === placedLabels.length && placed.every((item, index) => (
       placedLabels[index].text === item.text && placedLabels[index].kind === item.kind
     ));
-    if (same) {
+    if (!same) {
+      labelRoot.replaceChildren();
+      placedLabels = placed.map((item) => {
+        const node = document.createElement("span");
+        node.className = `map-label map-label-${item.kind}`;
+        node.textContent = item.text;
+        labelRoot.append(node);
+        return { node, x: item.mapX, y: item.mapY, text: item.text, kind: item.kind };
+      });
+    } else {
       for (let i = 0; i < placed.length; i += 1) {
         placedLabels[i].x = placed[i].mapX;
         placedLabels[i].y = placed[i].mapY;
       }
-      positionLabels();
-      return;
     }
-    labelRoot.replaceChildren();
-    placedLabels = placed.map((item) => {
-      const node = document.createElement("span");
-      node.className = `map-label map-label-${item.kind}`;
-      node.textContent = item.text;
-      labelRoot.append(node);
-      return { node, x: item.mapX, y: item.mapY, text: item.text, kind: item.kind };
-    });
     positionLabels();
   }
 
-  function scheduleLabels() {
-    cancelAnimationFrame(labelFrame);
-    labelFrame = requestAnimationFrame(updateLabels);
-  }
-
-  function toScreen(x, y) {
+  function positionLabels() {
     const left = camera.cx - camera.w / 2;
     const top = camera.cy - camera.h / 2;
-    return {
-      x: ((x - left) / camera.w) * box.width,
-      y: ((y - top) / camera.h) * box.height,
-    };
+    const sx = box.width / camera.w;
+    const sy = box.height / (camera.h || 1);
+    for (let i = 0; i < placedLabels.length; i += 1) {
+      const item = placedLabels[i];
+      const px = (item.x - left) * sx;
+      const py = (item.y - top) * sy;
+      item.node.style.left = `${px}px`;
+      item.node.style.top = `${py}px`;
+      item.node.style.visibility = px < -40 || py < -20 || px > box.width + 40 || py > box.height + 20 ? "hidden" : "visible";
+    }
   }
 
   function screenToMap(clientX, clientY) {
@@ -357,10 +411,7 @@ export function createMapView(svg, catalog, atoms) {
     return -1;
   }
 
-  terrain.style.display = layers.terrain ? "" : "none";
-
   return {
-    elements,
     get camera() {
       return camera;
     },
@@ -372,44 +423,73 @@ export function createMapView(svg, catalog, atoms) {
     },
     setLayers(next) {
       layers = next;
-      terrain.style.display = layers.terrain ? "" : "none";
-      provinceBorders.style.display = layers.provinceBorders ? "" : "none";
-      scheduleLabels();
+      invalidateBorders();
+      if (!live) draw();
+      updateLabels();
     },
     paintAll,
-    paintAtoms(indexes) {
-      for (const index of indexes) paintAtom(index);
-      scheduleBorders();
-    },
+    paintAtoms,
     setDeferBorders(value) {
       deferBorders = value;
-      if (!value) scheduleBorders();
+      if (!value) {
+        invalidateBorders();
+        if (!live) draw();
+      }
     },
-    rebuildBorders,
-    setHover,
-    setSelected,
+    setLive(value) {
+      live = value;
+      if (!value) {
+        layer.style.transform = "";
+        draw();
+        updateLabels();
+      }
+    },
+    rebuildBorders() {
+      invalidateBorders();
+      if (!deferBorders && !live) draw();
+    },
+    setHover(indexes) {
+      hoverIndexes = indexes || [];
+      if (!live) drawOverlay();
+    },
+    setSelected(indexes) {
+      selectedIndexes = indexes || [];
+      if (!live) drawOverlay();
+    },
     setCamera(next) {
       camera = { ...camera, ...next };
-      applyCamera();
+      ensureHeight();
+      if (live) updateLiveTransform();
+      else {
+        cancelAnimationFrame(drawFrame);
+        drawFrame = 0;
+        draw();
+        if (!labelFrame) labelFrame = requestAnimationFrame(() => {
+          labelFrame = 0;
+          updateLabels();
+        });
+      }
     },
     refreshBox,
     resize() {
+      live = false;
+      layer.style.transform = "";
       refreshBox();
-      applyCamera();
-      scheduleCull();
-      scheduleLabels();
+      draw();
+      updateLabels();
     },
     settle() {
-      scheduleCull();
-      scheduleLabels();
-      scheduleBorders();
+      live = false;
+      layer.style.transform = "";
+      invalidateBorders();
+      draw();
+      updateLabels();
     },
     hitTest,
     screenToMap,
     destroy() {
       cancelAnimationFrame(labelFrame);
-      cancelAnimationFrame(borderFrame);
-      cancelAnimationFrame(cullFrame);
+      cancelAnimationFrame(drawFrame);
     },
   };
 }
@@ -427,8 +507,8 @@ function pointInRing(x, y, ring) {
 }
 
 function pointInAtom(x, y, atom) {
-  const box = atom.b;
-  if (x < box[0] || x > box[2] || y < box[1] || y > box[3]) return false;
+  const bounds = atom.b;
+  if (x < bounds[0] || x > bounds[2] || y < bounds[1] || y > bounds[3]) return false;
   let inside = false;
   for (const ring of atom.rings) {
     if (pointInRing(x, y, ring)) inside = !inside;
@@ -447,16 +527,16 @@ function buildGrid(atoms, mapW, mapH) {
     const c1 = Math.min(cols - 1, Math.floor(maxX / cell));
     const r0 = Math.max(0, Math.floor(minY / cell));
     const r1 = Math.min(rows - 1, Math.floor(maxY / cell));
-    for (let r = r0; r <= r1; r += 1) {
-      for (let c = c0; c <= c1; c += 1) buckets[r * cols + c].push(index);
+    for (let row = r0; row <= r1; row += 1) {
+      for (let col = c0; col <= c1; col += 1) buckets[row * cols + col].push(index);
     }
   });
   return {
     query(x, y) {
-      const c = Math.floor(x / cell);
-      const r = Math.floor(y / cell);
-      if (c < 0 || r < 0 || c >= cols || r >= rows) return [];
-      return buckets[r * cols + c];
+      const col = Math.floor(x / cell);
+      const row = Math.floor(y / cell);
+      if (col < 0 || row < 0 || col >= cols || row >= rows) return [];
+      return buckets[row * cols + col];
     },
   };
 }
